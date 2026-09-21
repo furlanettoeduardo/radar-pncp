@@ -1,0 +1,20 @@
+# caso-erro
+# Chamada sem codigoModalidadeContratacao de proposito. Formato de erro da API.
+fetched-at: 2026-09-21T17:25:23.1474680-03:00
+request:    GET https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao?dataInicial=20260915&dataFinal=20260921&uf=SP&pagina=1&tamanhoPagina=10
+status:     400
+
+access-control-allow-credentials: true
+access-control-allow-headers: Content-Type,Authorization,X-Requested-With,Content-Length,Accept,Origin,
+access-control-allow-methods: GET,PUT,POST,DELETE,OPTIONS
+access-control-allow-origin: *
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+Content-Type: application/json
+Date: Mon, 21 Sep 2026 20:25:22 GMT
+Expires: 0
+pragma: no-cache
+strict-transport-security: max-age=15768000
+Transfer-Encoding: chunked
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-xss-protection: 1; mode=block

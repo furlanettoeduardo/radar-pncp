@@ -1,0 +1,20 @@
+# contratacao-detalhe
+# Detalhe derivado do primeiro registro da lista (cnpj=44935278000126 ano=2025 seq=343).
+fetched-at: 2026-09-21T17:25:22.7435167-03:00
+request:    GET https://pncp.gov.br/api/consulta/v1/orgaos/44935278000126/compras/2025/343
+status:     200
+
+access-control-allow-credentials: true
+access-control-allow-headers: Content-Type,Authorization,X-Requested-With,Content-Length,Accept,Origin,
+access-control-allow-methods: GET,PUT,POST,DELETE,OPTIONS
+access-control-allow-origin: *
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+Content-Type: application/json
+Date: Mon, 21 Sep 2026 20:25:20 GMT
+Expires: 0
+pragma: no-cache
+strict-transport-security: max-age=15768000
+Transfer-Encoding: chunked
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-xss-protection: 1; mode=block

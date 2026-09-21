@@ -1,0 +1,119 @@
+{
+    "data":  [
+                 {
+                     "srp":  false,
+                     "orgaoEntidade":  {
+                                           "cnpj":  "44935278000126",
+                                           "razaoSocial":  "MUNICIPIO DE RANCHARIA",
+                                           "poderId":  "N",
+                                           "esferaId":  "M"
+                                       },
+                     "anoCompra":  2025,
+                     "sequencialCompra":  343,
+                     "dataInclusao":  "2026-09-01T14:20:41",
+                     "dataPublicacaoPncp":  "2026-09-01T14:20:41",
+                     "dataAtualizacao":  "2026-09-01T14:20:41",
+                     "numeroCompra":  "73",
+                     "unidadeOrgao":  {
+                                          "ufNome":  "São Paulo",
+                                          "codigoUnidade":  "1",
+                                          "nomeUnidade":  "MUNICIPIO DE RANCHARIA",
+                                          "ufSigla":  "SP",
+                                          "municipioNome":  "Rancharia",
+                                          "codigoIbge":  "3542206"
+                                      },
+                     "amparoLegal":  {
+                                         "descricao":  "pregão: modalidade de licitação obrigatória para aquisição de bens e serviços comuns",
+                                         "nome":  "Lei 14.133/2021, Art. 28, I",
+                                         "codigo":  1
+                                     },
+                     "dataAberturaProposta":  "2026-09-02T08:00:00",
+                     "dataEncerramentoProposta":  "2026-09-21T17:30:00",
+                     "informacaoComplementar":  "Aquisição de brinquedos pedagógicos e educativos para as salas de Atendimento Educacional Especializado (AEE).",
+                     "processo":  "73",
+                     "objetoCompra":  "AQUISIÇÃO DE BRINQUEDOS PEDAGÓGICOS EDUCATIVOS DESTINADOS AS SALAS DE ATENDIMENTO EDUCACIONAL ESPECIALIZADO (AEE) DA REDE MUNICIPAL DE ENSINO",
+                     "linkSistemaOrigem":  "https://transparencia.rancharia.sp.gov.br/transparencia/",
+                     "justificativaPresencial":  null,
+                     "unidadeSubRogada":  null,
+                     "orgaoSubRogado":  null,
+                     "valorTotalHomologado":  null,
+                     "emendaParlamentar":  null,
+                     "dataAtualizacaoGlobal":  "2026-09-01T14:22:01",
+                     "numeroControlePNCP":  "44935278000126-1-000343/2025",
+                     "linkProcessoEletronico":  null,
+                     "modalidadeId":  6,
+                     "modoDisputaId":  3,
+                     "valorTotalEstimado":  14785.32,
+                     "modalidadeNome":  "Pregão - Eletrônico",
+                     "modoDisputaNome":  "Aberto-Fechado",
+                     "tipoInstrumentoConvocatorioCodigo":  1,
+                     "tipoInstrumentoConvocatorioNome":  "Edital",
+                     "fontesOrcamentarias":  [
+
+                                             ],
+                     "situacaoCompraId":  1,
+                     "situacaoCompraNome":  "Divulgada no PNCP",
+                     "usuarioNome":  "Fiorilli Software"
+                 },
+                 {
+                     "srp":  true,
+                     "orgaoEntidade":  {
+                                           "cnpj":  "45157104000142",
+                                           "razaoSocial":  "MUNICIPIO DE TANABI",
+                                           "poderId":  "N",
+                                           "esferaId":  "M"
+                                       },
+                     "anoCompra":  2026,
+                     "sequencialCompra":  107,
+                     "dataInclusao":  "2026-09-11T14:03:04",
+                     "dataPublicacaoPncp":  "2026-09-11T14:03:04",
+                     "dataAtualizacao":  "2026-09-11T14:03:04",
+                     "numeroCompra":  "92",
+                     "unidadeOrgao":  {
+                                          "ufNome":  "São Paulo",
+                                          "codigoUnidade":  "1",
+                                          "nomeUnidade":  "PREFEITURA MUNIC DE TANABI",
+                                          "ufSigla":  "SP",
+                                          "municipioNome":  "Tanabi",
+                                          "codigoIbge":  "3553401"
+                                      },
+                     "amparoLegal":  {
+                                         "descricao":  "pregão: modalidade de licitação obrigatória para aquisição de bens e serviços comuns",
+                                         "nome":  "Lei 14.133/2021, Art. 28, I",
+                                         "codigo":  1
+                                     },
+                     "dataAberturaProposta":  "2026-09-21T00:01:00",
+                     "dataEncerramentoProposta":  "2026-09-21T23:59:00",
+                     "informacaoComplementar":  "Para instrução dos autos, a área demandante encaminhou os seguintes documentos: \r\n\r\nDocumento de Formalização de Demanda;\r\nEstudo Técnico Preliminar;\r\nAnexo ao ETP – Mapa de Gerenciamento de Riscos da Contratação; e\r\nTermo de Referência.\r\n",
+                     "processo":  "92",
+                     "objetoCompra":  "Registro de Preços para futura e eventual contratação de empresa especializada para locação, por diária, de Ambulância Tipo A – Transporte Simples/Remoção, destinada ao transporte eletivo de pacientes usuários do Sistema Único de Saúde – SUS, conforme condições, especificações, quantidades e demais exigências estabelecidas no Termo de Referência.",
+                     "linkSistemaOrigem":  "http://portalcompras.tanabi.sp.gov.br",
+                     "justificativaPresencial":  null,
+                     "unidadeSubRogada":  null,
+                     "orgaoSubRogado":  null,
+                     "valorTotalHomologado":  null,
+                     "emendaParlamentar":  null,
+                     "dataAtualizacaoGlobal":  "2026-09-11T14:03:05",
+                     "numeroControlePNCP":  "45157104000142-1-000107/2026",
+                     "linkProcessoEletronico":  null,
+                     "modalidadeId":  6,
+                     "modoDisputaId":  1,
+                     "valorTotalEstimado":  163000.00,
+                     "modalidadeNome":  "Pregão - Eletrônico",
+                     "modoDisputaNome":  "Aberto",
+                     "tipoInstrumentoConvocatorioCodigo":  1,
+                     "tipoInstrumentoConvocatorioNome":  "Edital",
+                     "fontesOrcamentarias":  [
+
+                                             ],
+                     "situacaoCompraId":  1,
+                     "situacaoCompraNome":  "Divulgada no PNCP",
+                     "usuarioNome":  "Fiorilli Software"
+                 }
+             ],
+    "totalRegistros":  2,
+    "totalPaginas":  1,
+    "numeroPagina":  1,
+    "paginasRestantes":  0,
+    "empty":  false
+}

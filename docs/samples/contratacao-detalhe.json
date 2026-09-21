@@ -1,0 +1,58 @@
+{
+    "valorTotalEstimado":  14785.32,
+    "valorTotalHomologado":  null,
+    "orcamentoSigilosoCodigo":  1,
+    "orcamentoSigilosoDescricao":  "Compra sem sigilo",
+    "numeroControlePNCP":  "44935278000126-1-000343/2025",
+    "linkSistemaOrigem":  "https://transparencia.rancharia.sp.gov.br/transparencia/",
+    "linkProcessoEletronico":  null,
+    "anoCompra":  2025,
+    "sequencialCompra":  343,
+    "numeroCompra":  "73",
+    "processo":  "73",
+    "orgaoEntidade":  {
+                          "cnpj":  "44935278000126",
+                          "razaoSocial":  "MUNICIPIO DE RANCHARIA",
+                          "poderId":  "N",
+                          "esferaId":  "M"
+                      },
+    "unidadeOrgao":  {
+                         "ufNome":  "São Paulo",
+                         "codigoUnidade":  "1",
+                         "nomeUnidade":  "MUNICIPIO DE RANCHARIA",
+                         "ufSigla":  "SP",
+                         "municipioNome":  "Rancharia",
+                         "codigoIbge":  "3542206"
+                     },
+    "orgaoSubRogado":  null,
+    "unidadeSubRogada":  null,
+    "modalidadeId":  6,
+    "modalidadeNome":  "Pregão - Eletrônico",
+    "justificativaPresencial":  null,
+    "modoDisputaId":  3,
+    "modoDisputaNome":  "Aberto-Fechado",
+    "tipoInstrumentoConvocatorioCodigo":  1,
+    "tipoInstrumentoConvocatorioNome":  "Edital",
+    "amparoLegal":  {
+                        "descricao":  "pregão: modalidade de licitação obrigatória para aquisição de bens e serviços comuns",
+                        "nome":  "Lei 14.133/2021, Art. 28, I",
+                        "codigo":  1
+                    },
+    "objetoCompra":  "AQUISIÇÃO DE BRINQUEDOS PEDAGÓGICOS EDUCATIVOS DESTINADOS AS SALAS DE ATENDIMENTO EDUCACIONAL ESPECIALIZADO (AEE) DA REDE MUNICIPAL DE ENSINO",
+    "informacaoComplementar":  "Aquisição de brinquedos pedagógicos e educativos para as salas de Atendimento Educacional Especializado (AEE).",
+    "srp":  false,
+    "fontesOrcamentarias":  [
+
+                            ],
+    "emendaParlamentar":  false,
+    "dataPublicacaoPncp":  "2026-09-01T14:20:41",
+    "dataAberturaProposta":  "2026-09-02T08:00:00",
+    "dataEncerramentoProposta":  "2026-09-21T17:30:00",
+    "situacaoCompraId":  1,
+    "situacaoCompraNome":  "Divulgada no PNCP",
+    "existeResultado":  false,
+    "dataInclusao":  "2026-09-01T14:20:41",
+    "dataAtualizacao":  "2026-09-01T14:20:41",
+    "dataAtualizacaoGlobal":  "2026-09-01T14:22:01",
+    "usuarioNome":  "Fiorilli Software"
+}

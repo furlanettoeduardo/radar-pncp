@@ -1,0 +1,189 @@
+{
+    "data":  [
+                 {
+                     "srp":  true,
+                     "orgaoEntidade":  {
+                                           "cnpj":  "00394429000100",
+                                           "razaoSocial":  "COMANDO DA AERONAUTICA",
+                                           "poderId":  "E",
+                                           "esferaId":  "F"
+                                       },
+                     "anoCompra":  2026,
+                     "sequencialCompra":  2331,
+                     "dataInclusao":  "2026-09-15T04:00:06",
+                     "dataPublicacaoPncp":  "2026-09-15T04:00:06",
+                     "dataAtualizacao":  "2026-09-15T04:00:06",
+                     "numeroCompra":  "39",
+                     "unidadeOrgao":  {
+                                          "ufNome":  "São Paulo",
+                                          "codigoUnidade":  "120060",
+                                          "nomeUnidade":  "ACADEMIA DA FORCA AEREA",
+                                          "ufSigla":  "SP",
+                                          "municipioNome":  "Pirassununga",
+                                          "codigoIbge":  "3539301"
+                                      },
+                     "amparoLegal":  {
+                                         "nome":  "Lei 14.133/2021, Art. 28, I",
+                                         "descricao":  "pregão: modalidade de licitação obrigatória para aquisição de bens e serviços comuns",
+                                         "codigo":  1
+                                     },
+                     "dataAberturaProposta":  "2026-09-15T08:00:00",
+                     "dataEncerramentoProposta":  "2026-09-28T09:00:00",
+                     "informacaoComplementar":  null,
+                     "processo":  "67511.000259/2026-17",
+                     "objetoCompra":  "Aquisição de Insumos de Hidráulica para a FAYS",
+                     "linkSistemaOrigem":  "https://cnetmobile.estaleiro.serpro.gov.br/comprasnet-web/public/compras/acompanhamento-compra?compra=12006005000392026",
+                     "justificativaPresencial":  null,
+                     "unidadeSubRogada":  null,
+                     "orgaoSubRogado":  null,
+                     "valorTotalHomologado":  null,
+                     "modalidadeId":  6,
+                     "emendaParlamentar":  null,
+                     "dataAtualizacaoGlobal":  "2026-09-15T04:05:28",
+                     "numeroControlePNCP":  "00394429000100-1-002331/2026",
+                     "linkProcessoEletronico":  "https://www2.fab.mil.br/licitacoesecontratos/index.php",
+                     "modoDisputaId":  3,
+                     "valorTotalEstimado":  331204.42,
+                     "modalidadeNome":  "Pregão - Eletrônico",
+                     "modoDisputaNome":  "Aberto-Fechado",
+                     "tipoInstrumentoConvocatorioCodigo":  1,
+                     "tipoInstrumentoConvocatorioNome":  "Edital",
+                     "fontesOrcamentarias":  [
+                                                 {
+                                                     "codigo":  4,
+                                                     "nome":  "Federal",
+                                                     "descricao":  "Recurso orçamentário federal disponível e devidamente vinculado à despesa que será realizada.",
+                                                     "dataInclusao":  "2026-09-15T04:00:07"
+                                                 }
+                                             ],
+                     "situacaoCompraId":  1,
+                     "situacaoCompraNome":  "Divulgada no PNCP",
+                     "usuarioNome":  "Compras.gov.br"
+                 },
+                 {
+                     "srp":  false,
+                     "orgaoEntidade":  {
+                                           "cnpj":  "26989715000102",
+                                           "razaoSocial":  "MINISTERIO PUBLICO DA UNIAO",
+                                           "poderId":  "E",
+                                           "esferaId":  "F"
+                                       },
+                     "anoCompra":  2026,
+                     "sequencialCompra":  1430,
+                     "dataInclusao":  "2026-09-15T04:00:11",
+                     "dataPublicacaoPncp":  "2026-09-15T04:00:11",
+                     "dataAtualizacao":  "2026-09-15T04:00:11",
+                     "numeroCompra":  "33",
+                     "unidadeOrgao":  {
+                                          "ufNome":  "São Paulo",
+                                          "codigoUnidade":  "200096",
+                                          "nomeUnidade":  "PROCURADORIA REG.TRAB. DA 15ª REGIÃO/SP",
+                                          "ufSigla":  "SP",
+                                          "municipioNome":  "São Paulo",
+                                          "codigoIbge":  "3550308"
+                                      },
+                     "amparoLegal":  {
+                                         "nome":  "Lei 14.133/2021, Art. 28, I",
+                                         "descricao":  "pregão: modalidade de licitação obrigatória para aquisição de bens e serviços comuns",
+                                         "codigo":  1
+                                     },
+                     "dataAberturaProposta":  "2026-09-15T08:00:00",
+                     "dataEncerramentoProposta":  "2026-09-29T09:30:00",
+                     "informacaoComplementar":  "Em caso de discrepância entre as informações constantes no Compras Governamentais e no Edital, prevalecerão aquelas previstas no Edital (e seus Anexos).",
+                     "processo":  "20.02.1500.0000798/2026-95",
+                     "objetoCompra":  "Contratação de serviços de limpeza, conservação e higienização, com fornecimento de mão de obra uniformizada, materiais de consumo, equipamentos e demais insumos necessários à execução dos serviços, para a Sede da Procuradoria Regional do Trabalho da 15ª Região e para as Procuradorias do Trabalho nos Municípios (PTMs) de Araçatuba, Araraquara, Bauru, Presidente Prudente, Ribeirão Preto, São José do Rio Preto, São José dos Campos e Sorocaba, conforme edital e seus anexos.",
+                     "linkSistemaOrigem":  "https://cnetmobile.estaleiro.serpro.gov.br/comprasnet-web/public/compras/acompanhamento-compra?compra=20009605000332026",
+                     "justificativaPresencial":  null,
+                     "unidadeSubRogada":  null,
+                     "orgaoSubRogado":  null,
+                     "valorTotalHomologado":  null,
+                     "modalidadeId":  6,
+                     "emendaParlamentar":  null,
+                     "dataAtualizacaoGlobal":  "2026-09-15T04:01:09",
+                     "numeroControlePNCP":  "26989715000102-1-001430/2026",
+                     "linkProcessoEletronico":  "https://protocoloadministrativo.mpt.mp.br",
+                     "modoDisputaId":  1,
+                     "valorTotalEstimado":  97627.03,
+                     "modalidadeNome":  "Pregão - Eletrônico",
+                     "modoDisputaNome":  "Aberto",
+                     "tipoInstrumentoConvocatorioCodigo":  1,
+                     "tipoInstrumentoConvocatorioNome":  "Edital",
+                     "fontesOrcamentarias":  [
+                                                 {
+                                                     "codigo":  4,
+                                                     "nome":  "Federal",
+                                                     "descricao":  "Recurso orçamentário federal disponível e devidamente vinculado à despesa que será realizada.",
+                                                     "dataInclusao":  "2026-09-15T04:00:12"
+                                                 }
+                                             ],
+                     "situacaoCompraId":  1,
+                     "situacaoCompraNome":  "Divulgada no PNCP",
+                     "usuarioNome":  "Compras.gov.br"
+                 },
+                 {
+                     "srp":  true,
+                     "orgaoEntidade":  {
+                                           "cnpj":  "00394452000103",
+                                           "razaoSocial":  "COMANDO DO EXERCITO",
+                                           "poderId":  "E",
+                                           "esferaId":  "F"
+                                       },
+                     "anoCompra":  2026,
+                     "sequencialCompra":  19941,
+                     "dataInclusao":  "2026-09-15T04:00:16",
+                     "dataPublicacaoPncp":  "2026-09-15T04:00:16",
+                     "dataAtualizacao":  "2026-09-15T04:00:16",
+                     "numeroCompra":  "253",
+                     "unidadeOrgao":  {
+                                          "ufNome":  "São Paulo",
+                                          "codigoUnidade":  "160518",
+                                          "nomeUnidade":  "BASE DE AVIACAO DE TAUBATE",
+                                          "ufSigla":  "SP",
+                                          "municipioNome":  "Taubaté",
+                                          "codigoIbge":  "3554102"
+                                      },
+                     "amparoLegal":  {
+                                         "nome":  "Lei 14.133/2021, Art. 28, I",
+                                         "descricao":  "pregão: modalidade de licitação obrigatória para aquisição de bens e serviços comuns",
+                                         "codigo":  1
+                                     },
+                     "dataAberturaProposta":  "2026-09-15T09:30:00",
+                     "dataEncerramentoProposta":  "2026-10-29T10:00:00",
+                     "informacaoComplementar":  "Havendo divergência entre o sistema e o Termo de Referência (TR), atentar as especificações do TR.",
+                     "processo":  "64009.007630/2026-55",
+                     "objetoCompra":  "2 BAvEx\tEventual aquisição de materiais e equipamentos de informática e de CFTV para as Unidades do Complexo de Aviação do Exército",
+                     "linkSistemaOrigem":  "https://cnetmobile.estaleiro.serpro.gov.br/comprasnet-web/public/compras/acompanhamento-compra?compra=16051805002532026",
+                     "justificativaPresencial":  null,
+                     "unidadeSubRogada":  null,
+                     "orgaoSubRogado":  null,
+                     "valorTotalHomologado":  null,
+                     "modalidadeId":  6,
+                     "emendaParlamentar":  null,
+                     "dataAtualizacaoGlobal":  "2026-09-15T04:01:41",
+                     "numeroControlePNCP":  "00394452000103-1-019941/2026",
+                     "linkProcessoEletronico":  "https://www.comprasnet.gov.br/seguro/loginPortal.asp",
+                     "modoDisputaId":  3,
+                     "valorTotalEstimado":  2520388.51,
+                     "modalidadeNome":  "Pregão - Eletrônico",
+                     "modoDisputaNome":  "Aberto-Fechado",
+                     "tipoInstrumentoConvocatorioCodigo":  1,
+                     "tipoInstrumentoConvocatorioNome":  "Edital",
+                     "fontesOrcamentarias":  [
+                                                 {
+                                                     "codigo":  4,
+                                                     "nome":  "Federal",
+                                                     "descricao":  "Recurso orçamentário federal disponível e devidamente vinculado à despesa que será realizada.",
+                                                     "dataInclusao":  "2026-09-15T04:00:17"
+                                                 }
+                                             ],
+                     "situacaoCompraId":  1,
+                     "situacaoCompraNome":  "Divulgada no PNCP",
+                     "usuarioNome":  "Compras.gov.br"
+                 }
+             ],
+    "totalRegistros":  1697,
+    "totalPaginas":  170,
+    "numeroPagina":  1,
+    "paginasRestantes":  169,
+    "empty":  false
+}

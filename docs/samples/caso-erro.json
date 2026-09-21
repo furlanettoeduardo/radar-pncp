@@ -1,0 +1,7 @@
+{
+    "timestamp":  "2026-09-21T20:25:22.198+00:00",
+    "status":  400,
+    "error":  "Bad Request",
+    "message":  "Required request parameter \u0027codigoModalidadeContratacao\u0027 for method parameter type Long is not present",
+    "path":  "/pncp-consulta/v1/contratacoes/publicacao"
+}
