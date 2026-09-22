@@ -7,6 +7,17 @@ spring:
       enabled: true
   main:
     banner-mode: off
+  datasource:
+    url: ${RADAR_DB_URL:jdbc:postgresql://localhost:5432/radar}
+    username: ${RADAR_DB_USERNAME:radar}
+    password: ${RADAR_DB_PASSWORD:radar}
+    hikari:
+      # Sized for a t3.micro, not for throughput. Raise it when a load test asks for it.
+      maximum-pool-size: 5
+      minimum-idle: 1
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
 
 server:
   port: ${SERVER_PORT:8080}
