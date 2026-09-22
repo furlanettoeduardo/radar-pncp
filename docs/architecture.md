@@ -47,11 +47,11 @@ flowchart LR
     class ING,PNCP,LLM,SQS,DLQ,DDB,CLIENT planned;
 ```
 
-## What exists today, after stage 01
+## What exists today, after stage 02
 
 | Component | State | Evidence |
 | --- | --- | --- |
-| `radar-domain` | Empty on purpose, purity enforced | `DomainPurityTest`, enforcer `enforce-domain-purity` |
+| `radar-domain` | Model, five scoring rules, scoring engine, three ports | 61 tests, including seeded invariants for the 0-100 bound and determinism |
 | `radar-shared` | Empty on purpose, purity enforced | `SharedContractsPurityTest`, enforcer `enforce-shared-purity` |
 | `radar-api` | Boots, Flyway migrates, actuator answers | `RadarApiApplicationIT`, 4 tests against real PostgreSQL 16 |
 | `radar-ingestion` | Boots, actuator answers | `RadarIngestionApplicationTest`, 3 tests |
@@ -72,8 +72,13 @@ That is the idle floor with no business logic in either service, measured on a d
 where PostgreSQL shares the host. It is the number every later stage is measured against: if a
 feature moves it materially, the feature pays for itself or it does not ship.
 
+The domain is framework free and enforced twice, by the maven-enforcer-plugin on the dependency
+tree and by `DomainPurityTest` on the imports. Both checks now run against real classes rather
+than an empty module.
+
 Not started: the PNCP client, the scheduler, SQS and its dead letter queue, LLM enrichment, the
-DynamoDB cache, the domain model itself, matching, GraphQL, auth and the EC2 deployment.
+DynamoDB cache, persistence of any kind, GraphQL, auth and the EC2 deployment. The three ports
+the domain needs are declared and have no implementations anywhere.
 
 ## Constraints that shape the design
 
@@ -86,6 +91,12 @@ These are not preferences; they decide what may and may not be added.
   is DynamoDB, compute is one EC2 instance.
 - **The domain is framework free.** See
   [ADR 0002](adr/0002-bom-import-and-enforced-domain-purity.md).
+- **Capability outranks geography.** Weights are data, a closed deadline disqualifies rather
+  than scoring low, and a criterion nobody could evaluate is reported as coverage rather than
+  as a penalty. See [ADR 0004](adr/0004-closed-segment-vocabulary-instead-of-cnae-inference.md)
+  and [ADR 0005](adr/0005-scoring-weights-disqualification-and-time.md).
+- **PNCP timestamps are naive.** They are read as America/Sao_Paulo at the adapter boundary and
+  the domain only ever sees `Instant`.
 - **`radar-api` owns the schema.** Flyway lives in `radar-api` and nowhere else, so there is
   exactly one writer of migrations even once `radar-ingestion` also writes rows.
 
