@@ -8,6 +8,24 @@ spring:
   main:
     banner-mode: off
 
+radar:
+  pncp:
+    base-url: https://pncp.gov.br/api/consulta
+    # PNCP requires codigoModalidadeContratacao on every call, and 6 is the only value the
+    # recorded samples evidence. A list from day one, so adding codes is config rather than code.
+    # Known limitation: the system therefore sees one modality out of PNCP's catalogue.
+    modality-codes:
+      - 6
+    # The only page size any sample evidences. Raising it is the single largest lever on request
+    # volume, and there is no evidence yet that PNCP accepts more.
+    page-size: 10
+    # Caps the whole fan-out, not just how much runs at once. One week of SP alone is 170 pages.
+    max-total-pages: 1000
+    max-concurrent-requests: 8
+    connect-timeout: 2s
+    read-timeout: 10s
+    user-agent: "radar-pncp/0.1.0 (+https://github.com/furlanettoeduardo/radar-pncp)"
+
 server:
   port: ${SERVER_PORT:8081}
   shutdown: graceful
