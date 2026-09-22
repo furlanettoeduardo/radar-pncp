@@ -49,7 +49,7 @@ and must not treat a failed run as an empty day.
 
 | Setting | Default | Label | Basis |
 | --- | --- | --- | --- |
-| `lookback-days` | `2` | **Guess, with a measured cost** | The value is a judgement about how much outage to survive. What it costs is measured, below. |
+| `lookback-days` | `2` | **Guess, with a measured cost** | The value is a judgement about how much outage to survive. What it costs is measured, below. Coupled to `max-total-pages`; see [ADR 0010](adr/0010-ingestion-runs-daily.md). |
 | `states` | `[]` (everywhere) | n/a | Empty is what `ProcurementQuery` already expresses and what PNCP accepts as an omitted `uf`. |
 
 ### What the lookback overlap actually costs
@@ -77,7 +77,10 @@ paying: a single missed run without it loses a day of notices permanently, and a
 one failure this system exists to prevent. But it is a real, recurring cost against somebody else's
 infrastructure and it should be stated as one.
 
-### Why the schedule should be daily, and what sub-daily would cost
+### Why the schedule is daily, and what sub-daily would cost
+
+Decided in [ADR 0010](adr/0010-ingestion-runs-daily.md), which also records what would change the
+answer and the lookback/cap coupling below.
 
 **PNCP's query granularity is a calendar date.** `dataInicial` and `dataFinal` are `yyyyMMdd`, so the
 narrowest window obtainable is one whole day. A run at any interval therefore fetches at least a
