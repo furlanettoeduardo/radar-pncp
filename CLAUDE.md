@@ -13,6 +13,9 @@ with an LLM, and matches them against company profiles.
 - Must run on a t3.micro (1 GB RAM). Two JVMs, -Xmx256m each. Reject any dependency
   that needs more, and say so instead of adding it.
 - Costs must stay inside the AWS free tier. Never suggest EKS, ALB, NAT Gateway, Fargate.
+- AWS region is us-east-1, for every resource including stage 8 Terraform. It is the region
+  our free tier covers, and keeping everything in one region avoids cross-region transfer
+  charges. See docs/adr/0011-aws-region-us-east-1.md.
 
 ## Modules
 - radar-domain: pure domain model and business rules, zero framework dependencies

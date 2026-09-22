@@ -2,10 +2,9 @@ spring:
   cloud:
     aws:
       region:
-        # NOTE: the region is an AWS cost decision and is deliberately conservative here.
-        # us-east-1 is unambiguously free-tier eligible; sa-east-1 would be far closer to PNCP
-        # but its free-tier coverage is not something this project has confirmed. Override with
-        # AWS_REGION once that is settled.
+        # us-east-1 for everything, because that is the region this free tier covers and
+        # cross-region transfer is billed. The ~150ms extra to reach PNCP is paid once per page by
+        # a daily batch, about 4-6s on a run with a 5 minute deadline. See docs/adr/0011.
         static: ${AWS_REGION:us-east-1}
   application:
     name: radar-ingestion
