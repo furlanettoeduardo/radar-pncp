@@ -26,6 +26,10 @@ radar:
     max-concurrent-requests: 8
     connect-timeout: 2s
     read-timeout: 10s
+    # Bounds a whole invocation, which per request timeouts do not. A healthy run at the cap is
+    # roughly 500 pages over 8 at a time, about a minute; this leaves five times that. Without it
+    # the worst case is 500 pages x 3 attempts x 10s, and a scheduler would start overlapping runs.
+    operation-deadline: 5m
     user-agent: "radar-pncp/0.1.0 (+https://github.com/furlanettoeduardo/radar-pncp)"
 
 server:

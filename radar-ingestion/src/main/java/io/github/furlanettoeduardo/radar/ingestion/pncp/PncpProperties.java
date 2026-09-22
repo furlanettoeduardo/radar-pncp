@@ -16,6 +16,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * <p>{@code maxTotalPages} caps the whole fan-out, not just how much of it runs at once. A wide
  * date range across every state is thousands of requests against a public API run by a public body.
  *
+ * <p>{@code operationDeadline} bounds a whole invocation. Per request timeouts bound one call; at
+ * the cap the arithmetic is unkind, and a degraded PNCP could otherwise keep one run alive for over
+ * half an hour. Once a scheduler triggers this periodically, that is overlapping runs.
+ *
  * <p>{@code userAgent} identifies this project and links to its repository. It is a public service;
  * being identifiable costs nothing and is the courteous default.
  */
@@ -28,6 +32,7 @@ public record PncpProperties(
     int maxConcurrentRequests,
     Duration connectTimeout,
     Duration readTimeout,
+    Duration operationDeadline,
     String userAgent) {
 
   public PncpProperties {
@@ -35,6 +40,7 @@ public record PncpProperties(
     Objects.requireNonNull(modalityCodes, "radar.pncp.modality-codes is required");
     Objects.requireNonNull(connectTimeout, "radar.pncp.connect-timeout is required");
     Objects.requireNonNull(readTimeout, "radar.pncp.read-timeout is required");
+    Objects.requireNonNull(operationDeadline, "radar.pncp.operation-deadline is required");
     Objects.requireNonNull(userAgent, "radar.pncp.user-agent is required");
     if (modalityCodes.isEmpty()) {
       throw new IllegalArgumentException(
@@ -49,6 +55,10 @@ public record PncpProperties(
     }
     if (readTimeout.isNegative() || readTimeout.isZero()) {
       throw new IllegalArgumentException("radar.pncp.read-timeout must be positive");
+    }
+    if (operationDeadline.compareTo(readTimeout) <= 0) {
+      throw new IllegalArgumentException(
+          "radar.pncp.operation-deadline must exceed the read timeout, or no request can finish");
     }
     if (userAgent.isBlank()) {
       throw new IllegalArgumentException("radar.pncp.user-agent must identify this client");

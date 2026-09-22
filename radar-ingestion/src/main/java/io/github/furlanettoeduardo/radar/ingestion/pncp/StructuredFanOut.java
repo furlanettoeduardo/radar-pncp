@@ -1,8 +1,12 @@
 package io.github.furlanettoeduardo.radar.ingestion.pncp;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.StructuredTaskScope;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
 /**
@@ -28,17 +32,29 @@ import java.util.function.Function;
  * <p>The scope itself has no concurrency ceiling: forking a thousand subtasks forks a thousand
  * virtual threads, and they would all hit the network at once. The semaphore is the ceiling, taken
  * inside each subtask so that a waiting job holds nothing but a parked virtual thread.
+ *
+ * <p>Nor does it bound the whole operation. Per job timeouts bound one call; a slow upstream and
+ * enough jobs keep an invocation alive for as long as the arithmetic allows. The deadline is the
+ * bound, and it matters most once a scheduler is periodically triggering this: an unbounded job
+ * under a periodic trigger is how runs begin overlapping.
  */
 public final class StructuredFanOut {
 
   private final int maxConcurrent;
+  private final Duration deadline;
 
-  public StructuredFanOut(int maxConcurrent) {
+  public StructuredFanOut(int maxConcurrent, Duration deadline) {
     if (maxConcurrent < 1) {
       throw new IllegalArgumentException(
           "at least one job must be allowed to run but was " + maxConcurrent);
     }
+    Objects.requireNonNull(deadline, "a fan out must have a whole operation deadline");
+    if (deadline.isNegative() || deadline.isZero()) {
+      throw new IllegalArgumentException(
+          "the fan out deadline must be positive but was " + deadline);
+    }
     this.maxConcurrent = maxConcurrent;
+    this.deadline = deadline;
   }
 
   public <T, R> List<R> runAll(List<T> inputs, Function<T, R> job) {
@@ -63,7 +79,7 @@ public final class StructuredFanOut {
                           }))
               .toList();
 
-      scope.join();
+      scope.joinUntil(Instant.now().plus(deadline));
       // Rethrow what actually failed rather than a wrapper: the caller distinguishes an
       // unavailable PNCP from a refused request, and a wrapper would hide that.
       scope.throwIfFailed(
@@ -74,6 +90,11 @@ public final class StructuredFanOut {
 
       return subtasks.stream().map(StructuredTaskScope.Subtask::get).toList();
 
+    } catch (TimeoutException expired) {
+      // Closing the scope on the way out interrupts every unfinished subtask and waits for it, so
+      // this propagates with nothing still running, exactly as a job failure does.
+      throw new FanOutTimedOutException(
+          "the fan out of %d jobs did not finish within %s".formatted(inputs.size(), deadline));
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException("interrupted while fanning out", interrupted);

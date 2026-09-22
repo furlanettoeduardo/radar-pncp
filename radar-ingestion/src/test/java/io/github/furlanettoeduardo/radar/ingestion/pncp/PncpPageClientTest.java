@@ -44,6 +44,7 @@ class PncpPageClientTest {
         8,
         Duration.ofSeconds(2),
         Duration.ofMillis(500),
+        Duration.ofSeconds(30),
         "radar-pncp/0.1.0 (+https://github.com/furlanettoeduardo/radar-pncp)");
   }
 

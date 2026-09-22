@@ -23,7 +23,7 @@ class StructuredFanOutTest {
   void returnsResultsInInputOrder() {
     List<Integer> inputs = IntStream.rangeClosed(1, 20).boxed().toList();
 
-    List<String> results = new StructuredFanOut(4).runAll(inputs, input -> "n" + input);
+    List<String> results = fanOut(4).runAll(inputs, input -> "n" + input);
 
     assertThat(results).hasSize(20).startsWith("n1", "n2", "n3").endsWith("n20");
   }
@@ -31,7 +31,7 @@ class StructuredFanOutTest {
   @Test
   @DisplayName("an empty fan out does no work rather than opening a scope for nothing")
   void anEmptyFanOutDoesNothing() {
-    assertThat(new StructuredFanOut(4).runAll(List.of(), input -> input)).isEmpty();
+    assertThat(fanOut(4).runAll(List.of(), input -> input)).isEmpty();
   }
 
   /**
@@ -45,7 +45,7 @@ class StructuredFanOutTest {
     AtomicInteger inFlight = new AtomicInteger();
     AtomicInteger highWaterMark = new AtomicInteger();
 
-    new StructuredFanOut(cap)
+    fanOut(cap)
         .runAll(
             IntStream.rangeClosed(1, 30).boxed().toList(),
             input -> {
@@ -70,7 +70,7 @@ class StructuredFanOutTest {
 
     assertThatThrownBy(
             () ->
-                new StructuredFanOut(8)
+                fanOut(8)
                     .runAll(
                         IntStream.rangeClosed(1, 40).boxed().toList(),
                         input -> {
@@ -101,7 +101,7 @@ class StructuredFanOutTest {
   void propagatesTheOriginalFailure() {
     assertThatThrownBy(
             () ->
-                new StructuredFanOut(2)
+                fanOut(2)
                     .runAll(
                         List.of(1, 2, 3),
                         input -> {
@@ -109,6 +109,39 @@ class StructuredFanOutTest {
                         }))
         .isInstanceOf(PncpUnavailableException.class)
         .hasMessage("PNCP answered 503");
+  }
+
+  @Test
+  @DisplayName("stops at the whole operation deadline rather than running until every job is done")
+  void stopsAtTheWholeOperationDeadline() {
+    Set<Integer> started = ConcurrentHashMap.newKeySet();
+    Set<Integer> terminated = ConcurrentHashMap.newKeySet();
+
+    assertThatThrownBy(
+            () ->
+                new StructuredFanOut(8, Duration.ofMillis(200))
+                    .runAll(
+                        IntStream.rangeClosed(1, 40).boxed().toList(),
+                        input -> {
+                          started.add(input);
+                          try {
+                            sleep(Duration.ofSeconds(5));
+                            return input;
+                          } finally {
+                            terminated.add(input);
+                          }
+                        }))
+        .isInstanceOf(FanOutTimedOutException.class)
+        .hasMessageContaining("did not finish within")
+        .hasMessageContaining("40 jobs");
+
+    // Same shape as the cancellation proof: nothing is still running when the failure surfaces.
+    assertThat(terminated).containsExactlyInAnyOrderElementsOf(started);
+    assertThat(started).isNotEmpty();
+  }
+
+  private static StructuredFanOut fanOut(int maxConcurrent) {
+    return new StructuredFanOut(maxConcurrent, Duration.ofSeconds(30));
   }
 
   private static void sleep(Duration duration) {

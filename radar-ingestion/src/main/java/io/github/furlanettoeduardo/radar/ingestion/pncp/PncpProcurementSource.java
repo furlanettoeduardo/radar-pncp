@@ -50,7 +50,8 @@ public final class PncpProcurementSource implements ProcurementSource {
     this.mapper = Objects.requireNonNull(mapper, "a source needs a mapper");
     this.properties = Objects.requireNonNull(properties, "a source needs its properties");
     this.meters = Objects.requireNonNull(meters, "a source needs somewhere to count rejections");
-    this.fanOut = new StructuredFanOut(properties.maxConcurrentRequests());
+    this.fanOut =
+        new StructuredFanOut(properties.maxConcurrentRequests(), properties.operationDeadline());
   }
 
   @Override

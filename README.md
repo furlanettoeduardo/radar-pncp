@@ -80,6 +80,8 @@ migrations.
 ## Documentation
 
 - [Architecture and current state](docs/architecture.md)
+- [Configuration, and which of it is evidence](docs/configuration.md) — every tunable number,
+  labelled evidenced, estimated or guessed
 - [Architecture decision records](docs/adr)
 - [Contributing](CONTRIBUTING.md) — branches, commits, TDD, definition of done
 - [How matching works](docs/adr/0005-scoring-weights-disqualification-and-time.md) — weights, disqualification and time
