@@ -7,6 +7,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
@@ -35,15 +37,23 @@ class StructuredFanOutTest {
   }
 
   /**
-   * Overlap is made real by holding every subtask long enough that they must contend. Counting
-   * total calls would prove nothing about the ceiling; only the observed maximum in flight does.
+   * Overlap is forced rather than hoped for. Each job counts down a latch sized to the cap and then
+   * waits on it, so the batch can only make progress once exactly {@code cap} jobs are in flight
+   * together. That makes the assertion deterministic and stronger than "did not exceed": a cap that
+   * was too low would deadlock the latch and time out, and one that was too high would push the
+   * high water mark above it.
+   *
+   * <p>An earlier version slept instead and asserted overlap above one. That measured whatever the
+   * machine happened to schedule, which is not a property of the code under test.
    */
   @Test
-  @DisplayName("never exceeds the concurrency cap, measured by maximum observed overlap")
-  void neverExceedsTheConcurrencyCap() {
+  @DisplayName("runs exactly as many jobs at once as the cap allows, no more and no fewer")
+  void honoursTheConcurrencyCapExactly() {
     int cap = 3;
     AtomicInteger inFlight = new AtomicInteger();
     AtomicInteger highWaterMark = new AtomicInteger();
+    CountDownLatch capReached = new CountDownLatch(cap);
+    AtomicInteger latchTimeouts = new AtomicInteger();
 
     fanOut(cap)
         .runAll(
@@ -51,14 +61,23 @@ class StructuredFanOutTest {
             input -> {
               int now = inFlight.incrementAndGet();
               highWaterMark.accumulateAndGet(now, Math::max);
-              sleep(Duration.ofMillis(40));
+              capReached.countDown();
+              try {
+                if (!capReached.await(5, TimeUnit.SECONDS)) {
+                  latchTimeouts.incrementAndGet();
+                }
+              } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("interrupted", interrupted);
+              }
               inFlight.decrementAndGet();
               return input;
             });
 
-    assertThat(highWaterMark.get()).isLessThanOrEqualTo(cap);
-    // And the work really did overlap, or the assertion above would be vacuous.
-    assertThat(highWaterMark.get()).isGreaterThan(1);
+    assertThat(latchTimeouts.get())
+        .as("a cap below %d would never let %d jobs run together", cap, cap)
+        .isZero();
+    assertThat(highWaterMark.get()).isEqualTo(cap);
   }
 
   @Test

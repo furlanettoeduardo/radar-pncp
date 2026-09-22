@@ -9,6 +9,13 @@ spring:
     banner-mode: off
 
 radar:
+  discovery:
+    # Overlaps the schedule deliberately rather than matching it. A run that looks back exactly as
+    # far as the interval loses everything published during an outage, and re-reading a day costs
+    # nothing because the consumer deduplicates on content hash.
+    lookback-days: 2
+    # Empty means every state, which is what PNCP accepts as an omitted uf.
+    states: []
   pncp:
     base-url: https://pncp.gov.br/api/consulta
     # PNCP requires codigoModalidadeContratacao on every call, and 6 is the only value the

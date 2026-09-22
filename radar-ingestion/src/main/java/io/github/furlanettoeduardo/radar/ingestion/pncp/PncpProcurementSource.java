@@ -30,7 +30,7 @@ import org.springframework.stereotype.Component;
  * from the query, because which modalities PNCP splits its catalogue into is a PNCP fact.
  */
 @Component
-public final class PncpProcurementSource implements ProcurementSource {
+public final class PncpProcurementSource implements ProcurementSource, ProcurementFetcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(PncpProcurementSource.class);
   private static final String REJECTED_COUNTER = "radar.pncp.notices.rejected";
@@ -64,6 +64,7 @@ public final class PncpProcurementSource implements ProcurementSource {
    * this side of the port, because they are storage and scheduling concerns rather than domain
    * data.
    */
+  @Override
   public List<FetchedProcurement> fetch(ProcurementQuery query) {
     List<PncpPageRequest> firstPages = firstPageOfEachCombination(query);
     requireWithinCap(firstPages.size(), query);
