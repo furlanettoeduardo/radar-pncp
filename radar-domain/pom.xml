@@ -34,6 +34,47 @@
       <artifactId>mockito-junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit-junit5</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-domain-purity</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <bannedDependencies>
+                  <searchTransitive>true</searchTransitive>
+                  <excludes>
+                    <exclude>org.springframework*:*</exclude>
+                    <exclude>jakarta.persistence:*</exclude>
+                    <exclude>javax.persistence:*</exclude>
+                    <exclude>org.hibernate*:*</exclude>
+                    <exclude>com.fasterxml.jackson*:*</exclude>
+                  </excludes>
+                  <message>
+                    radar-domain must stay framework free. Serialization, persistence and
+                    dependency injection belong in the adapters. If a domain type needs an
+                    annotation, the answer is a DTO in the adapter, not a relaxed rule.
+                    See docs/adr/0002-bom-import-and-enforced-domain-purity.md.
+                  </message>
+                </bannedDependencies>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>
