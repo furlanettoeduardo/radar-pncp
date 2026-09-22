@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
@@ -160,41 +161,50 @@ class StructuredFanOutTest {
   }
 
   /**
-   * An earlier version of this test asserted that at most {@code cap} jobs ever entered work, on
-   * the assumption that the failing job would be among the first to take a permit. Forking is
-   * ordered; <em>acquiring</em> is not. When the failing job lost the race for a permit, later jobs
-   * ran a full 300ms each before it ever failed, and the assertion broke about one run in five.
+   * The latch closes a narrow race, so this is built tightly enough to see it.
    *
-   * <p>What the latch actually promises is ordering-independent: once a failure is recorded, jobs
-   * that have not started are abandoned rather than run. So the assertion is that most of the batch
-   * never ran, which is true however the permits were handed out.
+   * <p>Shutting the scope down already stops jobs still waiting on a permit, because {@code
+   * Semaphore.acquire} is interruptible. The remaining gap is that a failing job releases its
+   * permit in a {@code finally} <em>before</em> the scope has processed the failure, so a waiting
+   * job can take the freed permit in between.
+   *
+   * <p>Two things make that observable. The cap is one, so exactly one job runs at a time and a
+   * single job slipping through is the difference between empty and not. And whichever job wins the
+   * permit race is the one that fails, rather than a job chosen by index: forking is ordered,
+   * acquiring is not, and an earlier version of this test broke one run in five purely because it
+   * assumed otherwise.
    */
   @Test
-  @DisplayName("a failure abandons the rest of the batch instead of working through it")
-  void aFailureAbandonsTheRestOfTheBatch() {
-    int jobs = 40;
-    Set<Integer> enteredWork = ConcurrentHashMap.newKeySet();
+  @DisplayName("no job starts work once a sibling has established the upstream is down")
+  void noJobStartsWorkOnceTheUpstreamIsKnownDown() {
+    int iterations = 10;
 
-    assertThatThrownBy(
-            () ->
-                new StructuredFanOut(2, Duration.ofSeconds(30))
-                    .runAll(
-                        IntStream.rangeClosed(1, jobs).boxed().toList(),
-                        input -> {
-                          if (input == 1) {
-                            sleep(Duration.ofMillis(50));
-                            throw new PncpUnavailableException("PNCP is down");
-                          }
-                          enteredWork.add(input);
-                          // A whole retry budget, the thing we do not want repeated 39 times.
-                          sleep(Duration.ofMillis(300));
-                          return input;
-                        }))
-        .isInstanceOf(PncpUnavailableException.class);
+    for (int iteration = 1; iteration <= iterations; iteration++) {
+      Set<Integer> enteredWork = ConcurrentHashMap.newKeySet();
+      AtomicBoolean firstToRun = new AtomicBoolean(true);
 
-    assertThat(enteredWork)
-        .as("jobs that did work against an upstream already known to be down")
-        .hasSizeLessThan(jobs / 2);
+      assertThatThrownBy(
+              () ->
+                  new StructuredFanOut(1, Duration.ofSeconds(30))
+                      .runAll(
+                          IntStream.rangeClosed(1, 20).boxed().toList(),
+                          input -> {
+                            if (firstToRun.compareAndSet(true, false)) {
+                              sleep(Duration.ofMillis(50));
+                              throw new PncpUnavailableException("PNCP is down");
+                            }
+                            enteredWork.add(input);
+                            sleep(Duration.ofMillis(100));
+                            return input;
+                          }))
+          .isInstanceOf(PncpUnavailableException.class);
+
+      assertThat(enteredWork)
+          .as(
+              "iteration %d: jobs that worked against an upstream already known to be down",
+              iteration)
+          .isEmpty();
+    }
   }
 
   private static StructuredFanOut fanOut(int maxConcurrent) {
