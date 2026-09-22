@@ -9,7 +9,7 @@ import java.util.Optional;
  * Decides whether a discovered procurement should be stored.
  *
  * <p>Two rules, both business decisions rather than plumbing, which is why they are here and not in
- * a message listener:
+ * a message listener or in SQL:
  *
  * <ul>
  *   <li><b>Idempotency by content.</b> The same content hash is not stored twice. SQS is
@@ -22,12 +22,29 @@ import java.util.Optional;
  *
  * <p>When either side has no source timestamp, the comparison cannot be made and the content hash
  * decides. Refusing instead would strand an update permanently: a notice PNCP published without a
- * timestamp could never replace one that has it, no matter how many times it changed.
+ * timestamp could never replace one that has it, no matter how many times it changed. Equal
+ * timestamps with different content are stored for the same reason, so the only rejection is a
+ * strictly older incoming timestamp.
  *
- * <p>Equal timestamps with different content are stored for the same reason. The source says the
- * two are contemporaneous, the hash says they differ, and only one of those can be acted on.
+ * <h2>Two consumers deciding at once</h2>
+ *
+ * <p>Reading, deciding and writing is check-then-act, and two consumers will race it. The fix is
+ * not to move the rule into the database — that would leave two copies of it, free to drift — but
+ * to make the write conditional and retry the whole decision when it loses.
+ *
+ * <p>Each write says "only if nothing has changed since I read". If something has, the decision was
+ * made against a state that no longer exists, so it is made again from the state that does. After
+ * {@link #MAX_ATTEMPTS} the attempt is abandoned to the caller: this runs under a queue consumer,
+ * and an unacknowledged message is redelivered by machinery that already has backoff, a receive
+ * count and a dead letter queue. Looping here would reimplement all three inside a listener thread.
  */
 public final class ProcurementIngestion {
+
+  /**
+   * Three, because losing twice in a row is already surprising at the expected volumes. A higher
+   * number would hide contention rather than surface it.
+   */
+  static final int MAX_ATTEMPTS = 3;
 
   private final ProcurementRepository repository;
 
@@ -38,26 +55,39 @@ public final class ProcurementIngestion {
   public IngestionOutcome record(Procurement incoming) {
     Objects.requireNonNull(incoming, "there is nothing to record");
 
-    Optional<Procurement> existing = repository.findByControlNumber(incoming.controlNumber());
-    if (existing.isEmpty()) {
-      repository.save(incoming);
-      return new IngestionOutcome.Stored(incoming);
+    for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      Optional<Procurement> existing = repository.findByControlNumber(incoming.controlNumber());
+
+      if (existing.isEmpty()) {
+        if (repository.insertIfAbsent(incoming)) {
+          return new IngestionOutcome.Stored(incoming);
+        }
+        // Somebody inserted between our read and our write. Decide again against what they wrote.
+        continue;
+      }
+
+      Procurement stored = existing.get();
+      if (stored.sourcePayloadHash().equals(incoming.sourcePayloadHash())) {
+        return new IngestionOutcome.Unchanged(incoming.controlNumber());
+      }
+      if (isStale(incoming, stored)) {
+        return new IngestionOutcome.Stale(
+            stored.sourceUpdatedAt().orElseThrow(), incoming.sourceUpdatedAt().orElseThrow());
+      }
+      if (repository.replaceIfUnchanged(incoming, stored.sourcePayloadHash())) {
+        return new IngestionOutcome.Stored(incoming);
+      }
+      // The row moved under us. Our decision was about a state that no longer exists.
     }
 
-    Procurement stored = existing.get();
-    if (stored.sourcePayloadHash().equals(incoming.sourcePayloadHash())) {
-      return new IngestionOutcome.Unchanged(incoming.controlNumber());
-    }
+    throw new ProcurementContentionException(incoming.controlNumber(), MAX_ATTEMPTS);
+  }
 
+  private static boolean isStale(Procurement incoming, Procurement stored) {
     Optional<Instant> storedAt = stored.sourceUpdatedAt();
     Optional<Instant> incomingAt = incoming.sourceUpdatedAt();
-    if (storedAt.isPresent()
+    return storedAt.isPresent()
         && incomingAt.isPresent()
-        && incomingAt.get().isBefore(storedAt.get())) {
-      return new IngestionOutcome.Stale(storedAt.get(), incomingAt.get());
-    }
-
-    repository.save(incoming);
-    return new IngestionOutcome.Stored(incoming);
+        && incomingAt.get().isBefore(storedAt.get());
   }
 }
