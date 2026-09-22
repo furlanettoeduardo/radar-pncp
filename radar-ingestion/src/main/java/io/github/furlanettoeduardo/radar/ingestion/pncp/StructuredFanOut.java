@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.StructuredTaskScope;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 /**
@@ -33,6 +34,13 @@ import java.util.function.Function;
  * virtual threads, and they would all hit the network at once. The semaphore is the ceiling, taken
  * inside each subtask so that a waiting job holds nothing but a parked virtual thread.
  *
+ * <p>One failure is also shared, not rediscovered. The first job to fail records why, and any job
+ * that has not started work yet abandons instead of running. Shutting the scope down mostly
+ * achieves this already, but only mostly: a failing job releases its permit before the scope has
+ * processed the failure, and in that window a waiting job can acquire it and start calling an
+ * upstream already known to be down. The latch closes that window, which turns a property that held
+ * by luck into one that holds by construction.
+ *
  * <p>Nor does it bound the whole operation. Per job timeouts bound one call; a slow upstream and
  * enough jobs keep an invocation alive for as long as the arithmetic allows. The deadline is the
  * bound, and it matters most once a scheduler is periodically triggering this: an unbounded job
@@ -57,12 +65,21 @@ public final class StructuredFanOut {
     this.deadline = deadline;
   }
 
+  private static void abandonIfUpstreamIsDown(AtomicReference<RuntimeException> firstFailure) {
+    RuntimeException alreadyFailed = firstFailure.get();
+    if (alreadyFailed != null) {
+      throw new FanOutAbandonedException(
+          "a sibling job already failed with: " + alreadyFailed.getMessage());
+    }
+  }
+
   public <T, R> List<R> runAll(List<T> inputs, Function<T, R> job) {
     if (inputs.isEmpty()) {
       return List.of();
     }
 
     Semaphore permits = new Semaphore(maxConcurrent);
+    AtomicReference<RuntimeException> firstFailure = new AtomicReference<>();
     try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
       List<StructuredTaskScope.Subtask<R>> subtasks =
           inputs.stream()
@@ -70,9 +87,20 @@ public final class StructuredFanOut {
                   input ->
                       scope.fork(
                           () -> {
+                            abandonIfUpstreamIsDown(firstFailure);
                             permits.acquire();
                             try {
+                              // Checked again after the permit: it may have been freed by the very
+                              // job that just failed.
+                              abandonIfUpstreamIsDown(firstFailure);
                               return job.apply(input);
+                            } catch (RuntimeException failure) {
+                              // Recorded before the permit is released, so nothing can slip in
+                              // between the two and start work against a dead upstream.
+                              if (!(failure instanceof FanOutAbandonedException)) {
+                                firstFailure.compareAndSet(null, failure);
+                              }
+                              throw failure;
                             } finally {
                               permits.release();
                             }
@@ -83,10 +111,16 @@ public final class StructuredFanOut {
       // Rethrow what actually failed rather than a wrapper: the caller distinguishes an
       // unavailable PNCP from a refused request, and a wrapper would hide that.
       scope.throwIfFailed(
-          cause ->
-              cause instanceof RuntimeException runtime
-                  ? runtime
-                  : new IllegalStateException("a fan out job failed", cause));
+          cause -> {
+            // Always report what actually went wrong, never an abandonment caused by it.
+            RuntimeException recorded = firstFailure.get();
+            if (recorded != null) {
+              return recorded;
+            }
+            return cause instanceof RuntimeException runtime
+                ? runtime
+                : new IllegalStateException("a fan out job failed", cause);
+          });
 
       return subtasks.stream().map(StructuredTaskScope.Subtask::get).toList();
 

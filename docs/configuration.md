@@ -17,9 +17,33 @@ and [ADR 0008](adr/0008-virtual-threads-and-structured-concurrency-for-page-fetc
 | `modality-codes` | `[6]` | **Evidenced, and a known limitation** | 6 is the only `codigoModalidadeContratacao` any sample uses. PNCP rejects the call without one. The system therefore sees a fraction of PNCP's catalogue, deliberately, rather than inventing the rest of the table. |
 | `max-concurrent-requests` | `8` | **Guess** | No PNCP rate-limit documentation was consulted and nothing in the samples speaks to it. 8 is a conventional polite number. |
 | `connect-timeout` | `2s` | **Guess** | No latency measurement. Convention. |
-| `read-timeout` | `10s` | **Guess** | Same. The sample headers carry `fetched-at` but no duration, so no observed PNCP latency exists anywhere in this repository. |
+| `read-timeout` | `10s` | **Guess** | Same. The sample headers carry `fetched-at` but no duration, so no observed PNCP latency exists anywhere in this repository. See the observation below — it is deliberately *not* evidence for this value. |
 | `operation-deadline` | `5m` | **Guess, with arithmetic behind it** | A healthy run at the cap is about 500 pages over 8 at a time, roughly a minute; this leaves five times that. The number it is protecting against is real: 500 pages × 3 attempts × a 10s read timeout is over half an hour for one invocation. |
+| `--enable-preview` | on the Dockerfile `ENTRYPOINT` | **Not a tunable** | `StructuredTaskScope` is a preview API in Java 21 and the image cannot run without the flag. Deliberately *not* in `JAVA_TOOL_OPTIONS`: docker compose sets that variable and replaced it wholesale, which stripped the flag and broke startup once. An entrypoint is the one place no orchestrator clobbers by accident. Guarded by `PreviewFlagWiringTest` at build time and `PreviewFeatures.requireEnabled()` at boot. See [ADR 0008](adr/0008-virtual-threads-and-structured-concurrency-for-page-fetching.md). |
 | `user-agent` | project + repo URL | n/a | Not a tunable. PNCP is run by a public body and being identifiable costs nothing. |
+
+### Observation, 2026-09-22: PNCP returned 504 under load
+
+Not evidence for a timeout value. Recorded because it is evidence of something else.
+
+On 2026-09-22 the live smoke test began failing against `contratacoes/publicacao`. Investigation
+from outside the JVM found:
+
+- a direct request to the same URL returned **504 Gateway Timeout after about 70 seconds**;
+- TCP to `pncp.gov.br:443` connected normally, so the host was reachable and the failure was
+  upstream of the origin rather than a network problem;
+- the same query had succeeded roughly an hour earlier, returning `totalRegistros: 1891`.
+
+**This is not a basis for tuning `read-timeout`.** A 504 from a gateway is unavailability, not
+latency: the origin never answered at all, so the number 70 measures how long PNCP's own
+infrastructure waits before giving up, not how long a healthy response takes. Raising a client
+timeout to accommodate it would record false evidence and would make a healthy client wait longer
+for answers that are not coming.
+
+What it *is* evidence for: **PNCP has bad days.** The adapter behaved correctly — it bounded the
+wait, retried, exhausted its budget and failed in about 61 seconds, which is three read timeouts
+plus backoff. Worth carrying into stage 4: the scheduler must expect an entire invocation to fail,
+and must not treat a failed run as an empty day.
 
 ## Resilience — hardcoded in `PncpPageClient`
 
@@ -34,6 +58,30 @@ and [ADR 0008](adr/0008-virtual-threads-and-structured-concurrency-for-page-fetc
 
 These four breaker values are smaller than Resilience4j's defaults (100 / 100 / 50% / 60s) because
 per-invocation call volume here is low. That reasoning is sound and the numbers are still taste.
+
+### Considered and deferred: lowering `minimumNumberOfCalls`
+
+Raised on 2026-09-22 and deliberately not done.
+
+At 10, the breaker cannot open until ten calls have been recorded. The breaker sits inside the
+retry, so each attempt counts, and eight concurrent page fetches reach ten around their second
+attempt — by which point the fan out has usually already cancelled itself, because the first job to
+exhaust its retries kills the run. **Within a single invocation the breaker opens at roughly the
+moment it has stopped mattering.** Lowering it to about 4 would make it bite during a fan out
+rather than after one.
+
+It was deferred because of what it trades. A genuinely isolated blip — one page, one bad moment —
+would trip the breaker, and with a 30 second open window that turns one failed page into one
+skipped invocation. **It converts a partial failure into a total one**, and there is no evidence
+yet about how PNCP actually fails: whether its bad moments are isolated or wholesale. The
+observation above is a single data point of the wholesale kind.
+
+Across invocations the breaker already works well, which is the case that matters most once a
+scheduler is driving this: the client is a singleton, so a run a minute after a failure finds the
+circuit open and fails immediately instead of repeating the discovery.
+
+Revisit when there is production evidence about the shape of PNCP's failures. Until then this is a
+decision on record rather than an untouched default.
 
 ## Scoring — the domain
 

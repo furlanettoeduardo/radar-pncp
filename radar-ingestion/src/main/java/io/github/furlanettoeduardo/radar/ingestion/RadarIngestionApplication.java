@@ -10,6 +10,9 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 public class RadarIngestionApplication {
 
   public static void main(String[] args) {
+    // Before Spring, so a missing preview flag reads as one sentence rather than as a
+    // BeanCreationException thirty frames deep.
+    PreviewFeatures.requireEnabled();
     SpringApplication.run(RadarIngestionApplication.class, args);
   }
 }

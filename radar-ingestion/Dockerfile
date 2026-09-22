@@ -26,7 +26,7 @@ RUN mvn -B -ntp -Dmaven.wagon.http.retryHandler.count=3 -pl radar-ingestion -am 
 
 # ---------------------------------------------------------------------------
 # Runtime stage. JRE only, unprivileged user, 256 MB heap as the t3.micro budget
-# requires. JAVA_TOOL_OPTIONS is overridable from docker-compose.yml.
+# requires. JAVA_TOOL_OPTIONS carries the heap and is overridable from docker-compose.yml.
 # ---------------------------------------------------------------------------
 FROM eclipse-temurin:21-jre-alpine
 RUN addgroup -S radar && adduser -S -G radar radar
@@ -34,7 +34,11 @@ WORKDIR /app
 COPY --from=build /workspace/radar-ingestion/target/radar-ingestion-*.jar /app/radar-ingestion.jar
 USER radar
 EXPOSE 8081
-# --enable-preview is required at run time too: StructuredTaskScope is a preview API in
-# Java 21 and preview classfiles refuse to load without it. See docs/adr/0008.
-ENV JAVA_TOOL_OPTIONS="-Xmx256m --enable-preview"
-ENTRYPOINT ["java", "-jar", "/app/radar-ingestion.jar"]
+ENV JAVA_TOOL_OPTIONS="-Xmx256m"
+# --enable-preview lives on the command line, NOT in JAVA_TOOL_OPTIONS. StructuredTaskScope is a
+# preview API in Java 21 and its classfiles refuse to load without the flag, so this is not a
+# tunable: the image cannot run without it. Every layer above can replace an environment variable
+# wholesale -- docker compose already did, which is how this broke once -- and none of them can
+# replace the entrypoint by accident. Heap stays in JAVA_TOOL_OPTIONS, where overriding it is
+# somebody's intent rather than a silent amputation. See docs/adr/0008.
+ENTRYPOINT ["java", "--enable-preview", "-jar", "/app/radar-ingestion.jar"]

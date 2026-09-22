@@ -41,6 +41,41 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
  *
  * <p>This is a diagnostic, not a unit test. It asserts only what must hold for its own output to be
  * meaningful; its value is in what it prints.
+ *
+ * <h2>When this fails, PNCP may be down rather than the adapter broken</h2>
+ *
+ * <p>This was not hypothetical on 2026-09-22: the same query that had worked an hour earlier began
+ * failing, and PNCP was returning 504 under load. Before reading the failure as a regression, check
+ * from outside the JVM.
+ *
+ * <p><b>Is PNCP answering at all?</b> No client timeout, so its gateway has time to say what it
+ * actually thinks:
+ *
+ * <pre>
+ *   curl -sS -o /dev/null -w '%{http_code} in %{time_total}s
+ * '  *     'https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao?dataInicial=20260915&amp;dataFinal=20260922&amp;codigoModalidadeContratacao=6&amp;uf=SP&amp;pagina=1&amp;tamanhoPagina=10'
+ *
+ *   # PowerShell
+ *   Invoke-WebRequest -Uri '...same URL...' -TimeoutSec 120
+ * </pre>
+ *
+ * <p>A <b>502, 503 or 504</b> is PNCP, not us. A <b>200</b> means the adapter is the suspect.
+ *
+ * <p><b>Is the host reachable?</b> Separates an upstream outage from a local network or DNS
+ * problem:
+ *
+ * <pre>
+ *   Test-NetConnection pncp.gov.br -Port 443      # PowerShell
+ *   nc -vz pncp.gov.br 443                        # or: openssl s_client -connect pncp.gov.br:443
+ * </pre>
+ *
+ * <p>TCP connecting while HTTP returns 5xx is the signature of a degraded origin behind a healthy
+ * gateway. TCP failing points at DNS, a proxy or the local network instead.
+ *
+ * <p><b>One arithmetic check worth doing.</b> If this test fails after roughly {@code 3 x
+ * read-timeout}, the client gave up before PNCP answered, so no HTTP status was ever received and
+ * the failure is a read timeout rather than the 504 a browser or curl would show. Those are
+ * different failures with the same cause, and only the external check above can tell them apart.
  */
 @EnabledIfSystemProperty(
     named = "pncp.live",

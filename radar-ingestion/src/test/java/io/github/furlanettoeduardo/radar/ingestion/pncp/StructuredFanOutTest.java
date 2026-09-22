@@ -140,6 +140,35 @@ class StructuredFanOutTest {
     assertThat(started).isNotEmpty();
   }
 
+  @Test
+  @DisplayName("once one job has failed, no further job starts work")
+  void noFurtherJobStartsWorkAfterTheFirstFailure() {
+    int cap = 2;
+    Set<Integer> enteredWork = ConcurrentHashMap.newKeySet();
+
+    assertThatThrownBy(
+            () ->
+                new StructuredFanOut(cap, Duration.ofSeconds(30))
+                    .runAll(
+                        IntStream.rangeClosed(1, 40).boxed().toList(),
+                        input -> {
+                          if (input == 1) {
+                            sleep(Duration.ofMillis(50));
+                            throw new PncpUnavailableException("PNCP is down");
+                          }
+                          enteredWork.add(input);
+                          // A whole retry budget, the thing we do not want repeated 39 times.
+                          sleep(Duration.ofMillis(300));
+                          return input;
+                        }))
+        .isInstanceOf(PncpUnavailableException.class);
+
+    // Only jobs already holding a permit when the failure landed may have started.
+    assertThat(enteredWork)
+        .as("jobs that started work after the upstream was known to be down")
+        .hasSizeLessThanOrEqualTo(cap);
+  }
+
   private static StructuredFanOut fanOut(int maxConcurrent) {
     return new StructuredFanOut(maxConcurrent, Duration.ofSeconds(30));
   }
