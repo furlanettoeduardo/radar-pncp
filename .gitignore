@@ -1,0 +1,31 @@
+# Build output
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!.mvn/jvm.config
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and local state
+*.log
+logs/
+
+# Local environment overrides
+.env
+.env.local
+application-local.yml
+application-local.properties
+
+# Local IDE / MCP wiring, machine specific
+.mcp.json
