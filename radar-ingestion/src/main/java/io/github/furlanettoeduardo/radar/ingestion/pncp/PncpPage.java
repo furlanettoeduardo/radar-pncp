@@ -9,8 +9,11 @@ import java.util.Objects;
  *
  * <p>Notices stay as parsed JSON here so that the page fetch stays one job. Deciding whether a
  * notice is a procurement belongs to the mapper, which can reject it by name.
+ *
+ * <p>{@code totalRecords} is PNCP's own count for the whole query, not the size of this page. It is
+ * what tells an operator whether a window is the size they thought it was.
  */
-public record PncpPage(List<JsonNode> notices, int totalPages, int pageNumber) {
+public record PncpPage(List<JsonNode> notices, int totalRecords, int totalPages, int pageNumber) {
 
   public PncpPage {
     Objects.requireNonNull(notices, "a page must have a notice list, empty if there are none");
@@ -19,7 +22,7 @@ public record PncpPage(List<JsonNode> notices, int totalPages, int pageNumber) {
 
   /** A 204, which PNCP answers with when a query matches nothing. Normal, not a failure. */
   public static PncpPage empty(int pageNumber) {
-    return new PncpPage(List.of(), 0, pageNumber);
+    return new PncpPage(List.of(), 0, 0, pageNumber);
   }
 
   public boolean isEmpty() {

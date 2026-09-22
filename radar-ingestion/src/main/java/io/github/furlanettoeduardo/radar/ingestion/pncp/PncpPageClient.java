@@ -166,6 +166,7 @@ public final class PncpPageClient {
     data.forEach(notices::add);
     return new PncpPage(
         notices,
+        envelope.path("totalRegistros").asInt(notices.size()),
         envelope.path("totalPaginas").asInt(1),
         envelope.path("numeroPagina").asInt(requestedPage));
   }

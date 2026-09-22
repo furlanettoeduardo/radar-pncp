@@ -66,6 +66,7 @@ class PncpPageClientTest {
     PncpPage page = clientWith(properties()).fetch(firstPage());
 
     assertThat(page.notices()).hasSize(3);
+    assertThat(page.totalRecords()).isEqualTo(1697);
     assertThat(page.totalPages()).isEqualTo(170);
     assertThat(page.pageNumber()).isEqualTo(1);
     assertThat(page.notices().get(0).get("numeroControlePNCP").asText())
