@@ -99,6 +99,46 @@ class KeywordMatchRuleTest {
     assertThat(outcome).isInstanceOf(RuleOutcome.NotApplicable.class);
   }
 
+  @Test
+  @DisplayName("a singular keyword matches the regular plural PNCP actually published")
+  void matchesRegularPluralsInTheObject() {
+    assertThat(rule.evaluate(describing("Aquisicao de brinquedos"), withKeywords("brinquedo"), NOW))
+        .isInstanceOf(RuleOutcome.Contributed.class);
+    assertThat(
+            rule.evaluate(
+                describing("Aquisicao de computadores"), withKeywords("computador"), NOW))
+        .isInstanceOf(RuleOutcome.Contributed.class);
+  }
+
+  @Test
+  @DisplayName("a plural keyword matches a singular object, so the supplier can type either")
+  void matchesWhenTheKeywordIsThePluralOne() {
+    assertThat(rule.evaluate(describing("Aquisicao de brinquedo"), withKeywords("brinquedos"), NOW))
+        .isInstanceOf(RuleOutcome.Contributed.class);
+    assertThat(
+            rule.evaluate(
+                describing("Aquisicao de computador"), withKeywords("computadores"), NOW))
+        .isInstanceOf(RuleOutcome.Contributed.class);
+  }
+
+  @Test
+  @DisplayName("plural folding does not turn into a prefix match")
+  void pluralFoldingDoesNotBecomeAPrefixMatch() {
+    RuleOutcome outcome =
+        rule.evaluate(describing("Servico de mao de obra cabocla"), withKeywords("cabo"), NOW);
+
+    assertThat(outcome).isInstanceOf(RuleOutcome.Silent.class);
+  }
+
+  @Test
+  @DisplayName("irregular Portuguese plurals are a known gap, recorded here rather than implied")
+  void doesNotHandleIrregularPlurals() {
+    RuleOutcome outcome =
+        rule.evaluate(describing("Aquisicao de materiais escolares"), withKeywords("material"), NOW);
+
+    assertThat(outcome).isInstanceOf(RuleOutcome.Silent.class);
+  }
+
   private static ScoringSubject describing(String objectDescription) {
     return new ScoringSubject(aProcurement().describing(objectDescription).build());
   }
