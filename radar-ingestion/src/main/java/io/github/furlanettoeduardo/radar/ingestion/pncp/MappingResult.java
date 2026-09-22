@@ -5,9 +5,14 @@ import java.util.Objects;
 /**
  * What became of one notice at the boundary.
  *
- * <p>Sealed so that a rejection cannot be mistaken for an absence. A bad record must not sink a
- * good page, and it must not vanish either: every rejection names the notice, the field and the
- * reason, so it can be logged, counted and chased.
+ * <p>Sealed so that three different things cannot be mistaken for one another. A bad record must
+ * not sink a good page and must not vanish either, so every rejection names the notice, the field
+ * and the reason.
+ *
+ * <p>{@link NotBiddable} is separate from {@link Rejected} on purpose. A dispensa with no proposal
+ * window is not an error, it is what a dispensa is — 9 of the 10 recorded modality 8 notices look
+ * like that — and counting it as a rejection would bury a real contract change under routine noise.
+ * One is logged at INFO and expected; the other at WARN and worth watching.
  */
 public sealed interface MappingResult {
 
@@ -15,6 +20,15 @@ public sealed interface MappingResult {
 
     public Mapped {
       Objects.requireNonNull(fetched, "a mapped result must carry what was mapped");
+    }
+  }
+
+  /** A valid notice that nobody can bid on, so it is not an opportunity for our users. */
+  record NotBiddable(String controlNumber, String reason) implements MappingResult {
+
+    public NotBiddable {
+      Objects.requireNonNull(controlNumber, "a skipped notice must still be named");
+      Objects.requireNonNull(reason, "a skipped notice must carry a reason");
     }
   }
 

@@ -3,6 +3,8 @@ package io.github.furlanettoeduardo.radar.ingestion.pncp;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.github.furlanettoeduardo.radar.domain.common.BrazilianState;
 import io.github.furlanettoeduardo.radar.domain.common.MonetaryValue;
+import io.github.furlanettoeduardo.radar.domain.procurement.Biddability;
+import io.github.furlanettoeduardo.radar.domain.procurement.BiddabilityAssessment;
 import io.github.furlanettoeduardo.radar.domain.procurement.Modality;
 import io.github.furlanettoeduardo.radar.domain.procurement.PncpControlNumber;
 import io.github.furlanettoeduardo.radar.domain.procurement.Procurement;
@@ -26,9 +28,12 @@ import org.springframework.stereotype.Component;
  * <ul>
  *   <li><b>Illegal</b>: {@code numeroControlePNCP}, {@code objetoCompra}, {@code
  *       unidadeOrgao.ufSigla}, {@code modalidadeId}, {@code modalidadeNome}, {@code
- *       dataPublicacaoPncp}, {@code dataAberturaProposta}, {@code dataEncerramentoProposta}. Any of
- *       these missing and the notice is rejected, named and counted. A half built procurement is
- *       never produced.
+ *       dataPublicacaoPncp}. Any of these missing and the notice is rejected, named and counted. A
+ *       half built procurement is never produced.
+ *   <li><b>Assessed together</b>: {@code dataAberturaProposta} and {@code
+ *       dataEncerramentoProposta}. Both absent is not an error but a business outcome, decided by
+ *       {@link Biddability} in the domain; exactly one absent, or a window that closes before it
+ *       opens, is malformed.
  *   <li><b>Legal</b>: {@code valorTotalEstimado}, absent when the budget is sigiloso, which the
  *       domain already models as an optional value. And {@code dataAtualizacaoGlobal}, a hint
  *       rather than domain data.
@@ -53,6 +58,18 @@ public final class PncpProcurementMapper {
             ? notice.get("numeroControlePNCP").asText()
             : MappingResult.Rejected.UNKNOWN_NOTICE;
     try {
+      BiddabilityAssessment biddability =
+          Biddability.assess(
+              optionalInstant(notice, "dataAberturaProposta"),
+              optionalInstant(notice, "dataEncerramentoProposta"));
+      if (biddability instanceof BiddabilityAssessment.NotBiddable notBiddable) {
+        return new MappingResult.NotBiddable(controlNumber, notBiddable.reason());
+      }
+      if (biddability instanceof BiddabilityAssessment.Malformed malformed) {
+        throw new FieldRejection("proposalWindow", malformed.reason());
+      }
+      BiddabilityAssessment.Biddable window = (BiddabilityAssessment.Biddable) biddability;
+
       Procurement procurement =
           new Procurement(
               new PncpControlNumber(requiredText(notice, "numeroControlePNCP")),
@@ -62,8 +79,8 @@ public final class PncpProcurementMapper {
               new Modality(
                   requiredInt(notice, "modalidadeId"), requiredText(notice, "modalidadeNome")),
               requiredInstant(notice, "dataPublicacaoPncp"),
-              requiredInstant(notice, "dataAberturaProposta"),
-              requiredInstant(notice, "dataEncerramentoProposta"),
+              window.opensAt(),
+              window.closesAt(),
               CanonicalJsonHash.of(notice),
               optionalInstant(notice, "dataAtualizacaoGlobal"));
 

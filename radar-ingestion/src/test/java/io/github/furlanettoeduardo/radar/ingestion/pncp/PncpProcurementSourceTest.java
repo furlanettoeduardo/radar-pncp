@@ -90,10 +90,7 @@ class PncpProcurementSourceTest {
     List<Procurement> found = sourceWith(500).find(ONE_WEEK_IN_SP);
 
     assertThat(found).hasSize(2);
-    assertThat(
-            meters
-                .counter("radar.pncp.notices.rejected", "field", "dataEncerramentoProposta")
-                .count())
+    assertThat(meters.counter("radar.pncp.notices.rejected", "field", "proposalWindow").count())
         .isEqualTo(1.0);
   }
 

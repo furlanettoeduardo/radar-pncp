@@ -20,8 +20,9 @@ radar:
     procurement-discovered: ${RADAR_PROCUREMENT_QUEUE:radar-procurement-discovered}
   discovery:
     # Overlaps the schedule deliberately rather than matching it. A run that looks back exactly as
-    # far as the interval loses everything published during an outage, and re-reading a day costs
-    # nothing because the consumer deduplicates on content hash.
+    # far as the interval loses everything published during an outage. The overlap is free on the
+    # storage side, because the consumer deduplicates on content hash, and NOT free on the request
+    # side: it is a full extra day of pages on every run. See docs/configuration.md.
     lookback-days: 2
     # Empty means every state, which is what PNCP accepts as an omitted uf.
     states: []
@@ -40,6 +41,9 @@ radar:
     # A multi-day catch-up belongs in chunking the window, not in loosening this. See ADR 0008.
     max-total-pages: 500
     max-concurrent-requests: 8
+    # Both measured on 2026-09-22 (n=4): connect took 0.05-0.09s, time to first byte 0.35-1.04s.
+    # Two calls also hung with zero bytes for 60s and ~7min, which is what read-timeout bounds and
+    # the reason to keep it low rather than raise it. See docs/configuration.md.
     connect-timeout: 2s
     read-timeout: 10s
     # Bounds a whole invocation, which per request timeouts do not. A healthy run at the cap is

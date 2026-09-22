@@ -16,11 +16,28 @@ and [ADR 0008](adr/0008-virtual-threads-and-structured-concurrency-for-page-fetc
 | `max-total-pages` | `500` | **Evidenced base, estimated multiplier** | The base is real: `contratacoes/publicacao` reports `totalPaginas: 170` for one week of SP at modality 6. The national daily figure of 100–160 pages is an extrapolation from SP's share of Brazilian municipalities, not a measurement. 500 is roughly three times that. |
 | `modality-codes` | `[6]` | **Evidenced, and a known limitation** | 6 is the only `codigoModalidadeContratacao` any sample uses. PNCP rejects the call without one. The system therefore sees a fraction of PNCP's catalogue, deliberately, rather than inventing the rest of the table. |
 | `max-concurrent-requests` | `8` | **Guess** | No PNCP rate-limit documentation was consulted and nothing in the samples speaks to it. 8 is a conventional polite number. |
-| `connect-timeout` | `2s` | **Guess** | No latency measurement. Convention. |
-| `read-timeout` | `10s` | **Guess** | Same. The sample headers carry `fetched-at` but no duration, so no observed PNCP latency exists anywhere in this repository. See the observation below — it is deliberately *not* evidence for this value. |
+| `connect-timeout` | `2s` | **Measured (n=4, 2026-09-22)** | Observed connect took 0.05–0.09s. 2s is over 20x the slowest measurement, which is generous on purpose: a connect that is merely slow should not fail, and a connect that never completes is what this bounds. |
+| `read-timeout` | `10s` | **Measured (n=4, 2026-09-22)** | Time to first byte on the consulta endpoint was 0.35s, 0.73s, 0.79s and 1.04s. 10s is about 10x the slowest normal response. Separately, two calls hung with zero bytes for over 60s and for about 7 minutes — that is what this value exists to bound, and the reason to keep it low rather than raise it. See the 504 observation below, which is still *not* evidence for this number. |
 | `operation-deadline` | `5m` | **Guess, with arithmetic behind it** | A healthy run at the cap is about 500 pages over 8 at a time, roughly a minute; this leaves five times that. The number it is protecting against is real: 500 pages × 3 attempts × a 10s read timeout is over half an hour for one invocation. |
 | `--enable-preview` | on the Dockerfile `ENTRYPOINT` | **Not a tunable** | `StructuredTaskScope` is a preview API in Java 21 and the image cannot run without the flag. Deliberately *not* in `JAVA_TOOL_OPTIONS`: docker compose sets that variable and replaced it wholesale, which stripped the flag and broke startup once. An entrypoint is the one place no orchestrator clobbers by accident. Guarded by `PreviewFlagWiringTest` at build time and `PreviewFeatures.requireEnabled()` at boot. See [ADR 0008](adr/0008-virtual-threads-and-structured-concurrency-for-page-fetching.md). |
 | `user-agent` | project + repo URL | n/a | Not a tunable. PNCP is run by a public body and being identifiable costs nothing. |
+
+### Measurement, 2026-09-22: normal latency and two hangs
+
+Four calls to `contratacoes/publicacao` on 2026-09-22:
+
+| | connect | time to first byte |
+| --- | --- | --- |
+| range across 4 calls | 0.05–0.09s | 0.35s, 0.73s, 0.79s, 1.04s |
+
+Separately, **two calls accepted the connection and sent zero bytes** — once for over 60 seconds, once
+for nearly 7 minutes — and the same query answered in about a second minutes later.
+
+That pair of facts is what promotes both timeouts from convention to measurement. A normal response
+arrives in about a second, so 10s is roughly ten times the slowest observed; and the hangs are
+precisely the failure a read timeout exists for. **The hangs argue for keeping the value low, not for
+raising it**: a client that waits out a 7-minute silence has turned a fast failure into a stalled
+run.
 
 ### Observation, 2026-09-22: PNCP returned 504 under load
 

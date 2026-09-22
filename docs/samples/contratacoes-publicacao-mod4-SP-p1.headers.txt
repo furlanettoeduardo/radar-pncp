@@ -1,0 +1,15 @@
+# contratacoes-publicacao-mod4-SP-p1
+# Modality 4, a single day, fetched to compare record shape across modalities.
+# Collected by hand rather than by fetch-samples.ps1, so the response headers were not
+# captured. Only the query is recorded here.
+fetched-at: 2026-09-22
+request:    GET https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao?dataInicial=20260917&dataFinal=20260917&codigoModalidadeContratacao=4&uf=SP&pagina=1&tamanhoPagina=10
+status:     200
+
+# VOLUME WARNING: this is a ONE day window (2026-09-17, a Thursday), while
+# contratacoes-publicacao.json (modality 6) covers SEVEN days including a weekend.
+# Their totalRegistros are not directly comparable, and treating them as if they were
+# understates modalities 4 and 8 by roughly 7x.
+#
+# These files are in English because CLAUDE.md requires it; the neighbouring headers
+# files are in Portuguese because fetch-samples.ps1 wrote them.

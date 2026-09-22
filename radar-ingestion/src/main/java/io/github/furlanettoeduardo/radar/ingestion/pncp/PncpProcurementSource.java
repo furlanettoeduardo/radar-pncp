@@ -34,6 +34,7 @@ public final class PncpProcurementSource implements ProcurementSource, Procureme
 
   private static final Logger LOG = LoggerFactory.getLogger(PncpProcurementSource.class);
   private static final String REJECTED_COUNTER = "radar.pncp.notices.rejected";
+  private static final String NOT_BIDDABLE_COUNTER = "radar.pncp.notices.not_biddable";
 
   private final PncpPageClient pageClient;
   private final PncpProcurementMapper mapper;
@@ -134,6 +135,7 @@ public final class PncpProcurementSource implements ProcurementSource, Procureme
     for (JsonNode notice : page.notices()) {
       switch (mapper.map(notice)) {
         case MappingResult.Mapped mapped -> into.add(mapped.fetched());
+        case MappingResult.NotBiddable skipped -> record(skipped);
         case MappingResult.Rejected rejection -> {
           rejected++;
           record(rejection, notice);
@@ -142,6 +144,8 @@ public final class PncpProcurementSource implements ProcurementSource, Procureme
     }
 
     if (rejected == page.notices().size()) {
+      // Only malformed notices count here. A page of dispensas with no proposal window is a normal
+      // page, not a contract change, which is why NotBiddable is a separate outcome.
       // One bad notice is data. Every notice on a page is a contract change, and continuing would
       // quietly report an empty day.
       throw new PncpMalformedResponseException(
@@ -150,20 +154,33 @@ public final class PncpProcurementSource implements ProcurementSource, Procureme
     }
   }
 
+  /**
+   * Expected, so INFO. A dispensa with no proposal window is what a dispensa is, and 9 of the 10
+   * recorded modality 8 notices look like this. Counted separately so that a rise here reads as
+   * "PNCP published more dispensas" rather than as "something broke".
+   */
+  private void record(MappingResult.NotBiddable skipped) {
+    meters.counter(NOT_BIDDABLE_COUNTER).increment();
+    LOG.info(
+        "PNCP notice not biddable: control={} reason={}",
+        skipped.controlNumber(),
+        skipped.reason());
+  }
+
   private void record(MappingResult.Rejected rejection, JsonNode notice) {
     meters.counter(REJECTED_COUNTER, "field", rejection.field()).increment();
 
     if (MappingResult.Rejected.UNKNOWN_NOTICE.equals(rejection.controlNumber())) {
       // Nothing identifies this notice, so the payload is the only way to chase it. Truncated,
       // because an unbounded body in a log line is how a 1 GB box runs out of disk.
-      LOG.error(
+      LOG.warn(
           "PNCP notice rejected: field={} reason={} payload={}",
           rejection.field(),
           rejection.reason(),
           Payloads.quote(notice.toString()));
       return;
     }
-    LOG.error(
+    LOG.warn(
         "PNCP notice rejected: control={} field={} reason={}",
         rejection.controlNumber(),
         rejection.field(),
