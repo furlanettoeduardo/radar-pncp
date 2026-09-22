@@ -147,6 +147,22 @@ class PncpProcurementMapperTest {
     assertThat(rejected.controlNumber()).isEqualTo("44935278000126-1-000343/2025");
   }
 
+  @Test
+  @DisplayName("a rejection says which kind of absence it was, since they have different causes")
+  void aRejectionDistinguishesAbsentFromNullFromBlank() {
+    ObjectNode blank = firstRecordedNoticeCopy();
+    blank.put("dataEncerramentoProposta", "  ");
+
+    assertThat(
+            ((MappingResult.Rejected) mapper.map(withoutField("dataEncerramentoProposta")))
+                .reason())
+        .isEqualTo("required field is absent from the payload");
+    assertThat(((MappingResult.Rejected) mapper.map(withNull("dataEncerramentoProposta"))).reason())
+        .isEqualTo("required field is present but null");
+    assertThat(((MappingResult.Rejected) mapper.map(blank)).reason())
+        .isEqualTo("required field is present but blank");
+  }
+
   private void assertRejectedOn(JsonNode notice, String expectedField) {
     assertThat(mapper.map(notice))
         .isInstanceOfSatisfying(

@@ -62,6 +62,67 @@ class CanonicalJsonHashTest {
   }
 
   @Test
+  @DisplayName("the same number written three ways hashes the same, or the corpus reprocesses")
+  void numericFormattingDoesNotMatter() {
+    String asInteger = CanonicalJsonHash.of("{\"valorTotalEstimado\":10000}");
+    String withTrailingZeros = CanonicalJsonHash.of("{\"valorTotalEstimado\":10000.00}");
+    String inScientificNotation = CanonicalJsonHash.of("{\"valorTotalEstimado\":1e4}");
+
+    assertThat(asInteger).isEqualTo(withTrailingZeros).isEqualTo(inScientificNotation);
+  }
+
+  @Test
+  @DisplayName("normalising numbers does not collapse genuinely different ones")
+  void differentNumbersStillDiffer() {
+    assertThat(CanonicalJsonHash.of("{\"a\":10000}"))
+        .isNotEqualTo(CanonicalJsonHash.of("{\"a\":10000.01}"));
+    assertThat(CanonicalJsonHash.of("{\"a\":0}")).isNotEqualTo(CanonicalJsonHash.of("{\"a\":0.1}"));
+  }
+
+  @Test
+  @DisplayName("zero and negative values normalise without surprises")
+  void zeroAndNegativesNormalise() {
+    assertThat(CanonicalJsonHash.of("{\"a\":0}")).isEqualTo(CanonicalJsonHash.of("{\"a\":0.00}"));
+    assertThat(CanonicalJsonHash.of("{\"a\":-1.50}"))
+        .isEqualTo(CanonicalJsonHash.of("{\"a\":-1.5}"));
+  }
+
+  @Test
+  @DisplayName("non ASCII keys sort by a total order, so input order still does not matter")
+  void nonAsciiKeysSortDeterministically() {
+    assertThat(CanonicalJsonHash.of("{\"ação\":1,\"abc\":2,\"órgão\":3}"))
+        .isEqualTo(CanonicalJsonHash.of("{\"órgão\":3,\"abc\":2,\"ação\":1}"));
+  }
+
+  @Test
+  @DisplayName("an explicit null and an absent field are the same thing, as they are to the mapper")
+  void explicitNullMatchesAbsence() {
+    assertThat(CanonicalJsonHash.of("{\"a\":1,\"valorTotalEstimado\":null}"))
+        .isEqualTo(CanonicalJsonHash.of("{\"a\":1}"));
+  }
+
+  @Test
+  @DisplayName("nulls nested deeper are normalised too")
+  void nestedNullsAreNormalised() {
+    assertThat(CanonicalJsonHash.of("{\"x\":{\"p\":1,\"q\":null}}"))
+        .isEqualTo(CanonicalJsonHash.of("{\"x\":{\"p\":1}}"));
+  }
+
+  @Test
+  @DisplayName("a null inside an array keeps its position, because position is content there")
+  void nullsInArraysArePreserved() {
+    assertThat(CanonicalJsonHash.of("{\"a\":[1,null,2]}"))
+        .isNotEqualTo(CanonicalJsonHash.of("{\"a\":[1,2]}"));
+  }
+
+  @Test
+  @DisplayName("a string that reads null is not a null")
+  void aStringIsNotANull() {
+    assertThat(CanonicalJsonHash.of("{\"a\":\"null\"}"))
+        .isNotEqualTo(CanonicalJsonHash.of("{\"a\":null}"));
+  }
+
+  @Test
   @DisplayName("refuses to hash something that is not JSON rather than hashing the error")
   void refusesNonJson() {
     assertThatIllegalArgumentException().isThrownBy(() -> CanonicalJsonHash.of("not json"));

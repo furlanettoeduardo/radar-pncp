@@ -2,7 +2,7 @@ package io.github.furlanettoeduardo.radar.ingestion.pncp;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -21,16 +21,20 @@ import java.util.Map;
  * output or emitting fields in a different order would present every notice in the catalogue as
  * changed.
  *
- * <p>Numbers are rendered as Jackson parsed them. A payload that changes {@code 100} to {@code
- * 100.0} is treated as changed, which is the conservative direction: a false positive costs one
- * redundant re-read, a false negative silently keeps stale data.
+ * <p>Numbers are normalised through {@code BigDecimal}, so {@code 10000}, {@code 10000.00} and
+ * {@code 1e4} are one value with one hash. Without that, PNCP changing how it formats a decimal
+ * would present the entire corpus as modified and reprocess all of it, which is the expensive
+ * failure this hash exists to prevent.
+ *
+ * <p>A field whose value is null is dropped, so an explicit null and an absent field hash the same.
+ * That is not a stylistic choice: the mapper already treats those two identically for every field,
+ * and a change detector that disagrees with the reader about what is the same is worse than no
+ * change detector. Nulls <em>inside arrays</em> are kept, because there position is content.
  *
  * <p>This is the authoritative change detector. {@code dataAtualizacaoGlobal} is the cheap one,
  * used to avoid computing this at all when PNCP already says nothing moved.
  */
 public final class CanonicalJsonHash {
-
-  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   private CanonicalJsonHash() {}
 
@@ -49,7 +53,7 @@ public final class CanonicalJsonHash {
       throw new IllegalArgumentException("cannot hash a blank payload");
     }
     try {
-      return MAPPER.readTree(rawJson);
+      return PncpJson.mapper().readTree(rawJson);
     } catch (JsonProcessingException cause) {
       throw new IllegalArgumentException("cannot hash a payload that is not JSON", cause);
     }
@@ -59,8 +63,13 @@ public final class CanonicalJsonHash {
     if (node.isObject()) {
       List<Map.Entry<String, JsonNode>> fields = new ArrayList<>();
       for (Iterator<Map.Entry<String, JsonNode>> it = node.fields(); it.hasNext(); ) {
-        fields.add(it.next());
+        Map.Entry<String, JsonNode> field = it.next();
+        if (!field.getValue().isNull()) {
+          fields.add(field);
+        }
       }
+      // String.compareTo is a total order over UTF-16 code units, which is all that is needed:
+      // deterministic, locale independent, and identical on every JVM.
       fields.sort(Map.Entry.comparingByKey());
 
       out.append('{');
@@ -90,7 +99,20 @@ public final class CanonicalJsonHash {
       writeString(node.textValue(), out);
       return;
     }
+    if (node.isNumber()) {
+      out.append(normalise(node.decimalValue()));
+      return;
+    }
     out.append(node.asText());
+  }
+
+  /**
+   * One rendering per numeric value, whatever notation PNCP used to write it. {@code
+   * stripTrailingZeros} collapses 10000.00 and 1e4 onto 10000, and {@code toPlainString} keeps very
+   * large and very small magnitudes out of exponent notation so that they normalise too.
+   */
+  private static String normalise(BigDecimal number) {
+    return number.stripTrailingZeros().toPlainString();
   }
 
   /** Quoted so that a value cannot be confused with a delimiter or with a neighbouring field. */

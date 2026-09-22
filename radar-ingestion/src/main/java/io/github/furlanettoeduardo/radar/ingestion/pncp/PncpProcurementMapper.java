@@ -7,7 +7,6 @@ import io.github.furlanettoeduardo.radar.domain.procurement.Modality;
 import io.github.furlanettoeduardo.radar.domain.procurement.PncpControlNumber;
 import io.github.furlanettoeduardo.radar.domain.procurement.Procurement;
 import java.io.Serial;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -80,8 +79,16 @@ public final class PncpProcurementMapper {
 
   private static String requiredText(JsonNode notice, String field) {
     JsonNode value = notice.get(field);
-    if (value == null || value.isNull() || value.asText().isBlank()) {
-      throw new FieldRejection(field, "the field is absent, null or blank");
+    // Told apart on purpose: "absent" and "null" send whoever reads the log to different places,
+    // one to the query and one to the record.
+    if (value == null) {
+      throw new FieldRejection(field, "required field is absent from the payload");
+    }
+    if (value.isNull()) {
+      throw new FieldRejection(field, "required field is present but null");
+    }
+    if (value.asText().isBlank()) {
+      throw new FieldRejection(field, "required field is present but blank");
     }
     String text = value.asText();
     if (text.indexOf(REPLACEMENT_CHARACTER) >= 0) {
@@ -93,8 +100,14 @@ public final class PncpProcurementMapper {
 
   private static int requiredInt(JsonNode notice, String field) {
     JsonNode value = notice.get(field);
-    if (value == null || value.isNull() || !value.canConvertToInt()) {
-      throw new FieldRejection(field, "the field is absent, null or not a whole number");
+    if (value == null) {
+      throw new FieldRejection(field, "required field is absent from the payload");
+    }
+    if (value.isNull()) {
+      throw new FieldRejection(field, "required field is present but null");
+    }
+    if (!value.canConvertToInt()) {
+      throw new FieldRejection(field, "required field is not a whole number: " + value.asText());
     }
     return value.asInt();
   }
@@ -143,8 +156,12 @@ public final class PncpProcurementMapper {
       return Optional.empty();
     }
     try {
-      // Read through the text rather than as a double, so 14785.32 stays 14785.32.
-      return Optional.of(new MonetaryValue(new BigDecimal(value.asText())));
+      if (!value.isNumber()) {
+        throw new FieldRejection(field, "not a number: " + value.asText());
+      }
+      // decimalValue on a payload parsed by PncpJson is the literal PNCP sent, not a double
+      // that has already lost it.
+      return Optional.of(new MonetaryValue(value.decimalValue()));
     } catch (NumberFormatException notANumber) {
       throw new FieldRejection(field, "not a number: " + value.asText());
     } catch (IllegalArgumentException negative) {
