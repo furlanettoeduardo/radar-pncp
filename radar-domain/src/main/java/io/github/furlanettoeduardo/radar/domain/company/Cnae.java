@@ -5,8 +5,8 @@ import java.util.Objects;
 /**
  * A Brazilian economic activity code, as a company declares it, for example {@code 6201-5/01}.
  *
- * <p>The code is kept exactly as given, because it is the company's own data and will be shown
- * back to them. Only the division, its first two digits, carries meaning for this system.
+ * <p>The code is kept exactly as given, because it is the company's own data and will be shown back
+ * to them. Only the division, its first two digits, carries meaning for this system.
  */
 public record Cnae(String code) {
 

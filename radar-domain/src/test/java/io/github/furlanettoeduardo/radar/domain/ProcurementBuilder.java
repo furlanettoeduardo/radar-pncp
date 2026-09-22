@@ -2,6 +2,7 @@ package io.github.furlanettoeduardo.radar.domain;
 
 import io.github.furlanettoeduardo.radar.domain.common.BrazilianState;
 import io.github.furlanettoeduardo.radar.domain.common.MonetaryValue;
+import io.github.furlanettoeduardo.radar.domain.procurement.Modality;
 import io.github.furlanettoeduardo.radar.domain.procurement.PncpControlNumber;
 import io.github.furlanettoeduardo.radar.domain.procurement.Procurement;
 import java.time.Instant;
@@ -15,6 +16,10 @@ public final class ProcurementBuilder {
   private BrazilianState state = BrazilianState.SP;
   private Optional<MonetaryValue> estimatedValue = Optional.of(MonetaryValue.of("50000.00"));
   private Instant proposalClosesAt = Instant.parse("2026-10-20T12:00:00Z");
+  private Modality modality = Modality.of(6, "Pregao - Eletronico");
+  private Instant publishedAt = Instant.parse("2026-09-01T14:20:41Z");
+  private Instant proposalOpensAt = Instant.parse("2026-09-02T08:00:00Z");
+  private String sourcePayloadHash = "0f5d1a5b1c2f4e6a8b9c0d1e2f3a4b5c";
 
   private ProcurementBuilder() {}
 
@@ -52,8 +57,21 @@ public final class ProcurementBuilder {
     return this;
   }
 
+  public ProcurementBuilder openingAt(Instant proposalOpensAt) {
+    this.proposalOpensAt = proposalOpensAt;
+    return this;
+  }
+
   public Procurement build() {
     return new Procurement(
-        controlNumber, objectDescription, state, estimatedValue, proposalClosesAt);
+        controlNumber,
+        objectDescription,
+        state,
+        estimatedValue,
+        modality,
+        publishedAt,
+        proposalOpensAt,
+        proposalClosesAt,
+        sourcePayloadHash);
   }
 }
