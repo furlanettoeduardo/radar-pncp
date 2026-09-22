@@ -64,11 +64,10 @@ public final class PncpProcurementMapper {
               requiredInstant(notice, "dataPublicacaoPncp"),
               requiredInstant(notice, "dataAberturaProposta"),
               requiredInstant(notice, "dataEncerramentoProposta"),
-              CanonicalJsonHash.of(notice));
+              CanonicalJsonHash.of(notice),
+              optionalInstant(notice, "dataAtualizacaoGlobal"));
 
-      return new MappingResult.Mapped(
-          new FetchedProcurement(
-              procurement, notice.toString(), optionalInstant(notice, "dataAtualizacaoGlobal")));
+      return new MappingResult.Mapped(new FetchedProcurement(procurement, notice.toString()));
 
     } catch (FieldRejection rejection) {
       return new MappingResult.Rejected(controlNumber, rejection.field(), rejection.getMessage());

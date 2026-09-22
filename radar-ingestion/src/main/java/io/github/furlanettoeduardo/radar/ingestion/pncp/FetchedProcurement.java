@@ -1,28 +1,23 @@
 package io.github.furlanettoeduardo.radar.ingestion.pncp;
 
 import io.github.furlanettoeduardo.radar.domain.procurement.Procurement;
-import java.time.Instant;
 import java.util.Objects;
-import java.util.Optional;
 
 /**
- * One notice as this adapter fetched it: the domain object, the bytes it came from, and the cheap
- * change detector PNCP publishes alongside it.
+ * One notice as this adapter fetched it: the domain object, and the bytes it came from.
  *
- * <p>The raw payload and {@code dataAtualizacaoGlobal} are storage and scheduling concerns, so they
- * stay on this side of the port. {@link
- * io.github.furlanettoeduardo.radar.domain.port.ProcurementSource} hands the domain the procurement
- * alone.
+ * <p>The raw payload stays on this side of the port. It is a storage concern, kept so that a later
+ * stage can persist exactly what PNCP sent rather than a re-rendering of it.
  *
- * <p>{@code sourceUpdatedAt} is optional because it is a hint. Losing it costs one redundant hash
- * computation; rejecting an otherwise valid notice over it would cost a real opportunity.
+ * <p>{@code dataAtualizacaoGlobal} used to live here too. It has moved onto {@link Procurement},
+ * because deciding whether an incoming notice supersedes the stored one turned out to be a business
+ * rule rather than a detail of fetching, and a rule the domain cannot see is a rule the domain
+ * cannot enforce.
  */
-public record FetchedProcurement(
-    Procurement procurement, String rawPayload, Optional<Instant> sourceUpdatedAt) {
+public record FetchedProcurement(Procurement procurement, String rawPayload) {
 
   public FetchedProcurement {
     Objects.requireNonNull(procurement, "a fetched procurement must carry a procurement");
     Objects.requireNonNull(rawPayload, "a fetched procurement must carry its raw payload");
-    Objects.requireNonNull(sourceUpdatedAt, "use Optional.empty() rather than null");
   }
 }

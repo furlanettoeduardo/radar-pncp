@@ -51,7 +51,8 @@ class PncpProcurementMapperTest {
     assertThat(mapped.fetched().rawPayload()).contains("numeroControlePNCP");
     assertThat(mapped.fetched().procurement().sourcePayloadHash())
         .isEqualTo(CanonicalJsonHash.of(firstRecordedNotice()));
-    assertThat(mapped.fetched().sourceUpdatedAt()).contains(Instant.parse("2026-09-01T17:22:01Z"));
+    assertThat(mapped.fetched().procurement().sourceUpdatedAt())
+        .contains(Instant.parse("2026-09-01T17:22:01Z"));
   }
 
   @Test
@@ -135,7 +136,7 @@ class PncpProcurementMapperTest {
     MappingResult result = mapper.map(withoutField("dataAtualizacaoGlobal"));
 
     assertThat(result).isInstanceOf(MappingResult.Mapped.class);
-    assertThat(((MappingResult.Mapped) result).fetched().sourceUpdatedAt()).isEmpty();
+    assertThat(((MappingResult.Mapped) result).fetched().procurement().sourceUpdatedAt()).isEmpty();
   }
 
   @Test

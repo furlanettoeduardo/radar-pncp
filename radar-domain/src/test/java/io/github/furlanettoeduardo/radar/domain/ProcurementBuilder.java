@@ -20,6 +20,7 @@ public final class ProcurementBuilder {
   private Instant publishedAt = Instant.parse("2026-09-01T14:20:41Z");
   private Instant proposalOpensAt = Instant.parse("2026-09-02T08:00:00Z");
   private String sourcePayloadHash = "0f5d1a5b1c2f4e6a8b9c0d1e2f3a4b5c";
+  private Optional<Instant> sourceUpdatedAt = Optional.of(Instant.parse("2026-09-01T17:22:01Z"));
 
   private ProcurementBuilder() {}
 
@@ -62,6 +63,21 @@ public final class ProcurementBuilder {
     return this;
   }
 
+  public ProcurementBuilder hashed(String sourcePayloadHash) {
+    this.sourcePayloadHash = sourcePayloadHash;
+    return this;
+  }
+
+  public ProcurementBuilder updatedAt(Instant sourceUpdatedAt) {
+    this.sourceUpdatedAt = Optional.of(sourceUpdatedAt);
+    return this;
+  }
+
+  public ProcurementBuilder withoutSourceTimestamp() {
+    this.sourceUpdatedAt = Optional.empty();
+    return this;
+  }
+
   public Procurement build() {
     return new Procurement(
         controlNumber,
@@ -72,6 +88,7 @@ public final class ProcurementBuilder {
         publishedAt,
         proposalOpensAt,
         proposalClosesAt,
-        sourcePayloadHash);
+        sourcePayloadHash,
+        sourceUpdatedAt);
   }
 }
