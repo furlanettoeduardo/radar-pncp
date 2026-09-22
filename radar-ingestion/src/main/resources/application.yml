@@ -1,4 +1,12 @@
 spring:
+  cloud:
+    aws:
+      region:
+        # NOTE: the region is an AWS cost decision and is deliberately conservative here.
+        # us-east-1 is unambiguously free-tier eligible; sa-east-1 would be far closer to PNCP
+        # but its free-tier coverage is not something this project has confirmed. Override with
+        # AWS_REGION once that is settled.
+        static: ${AWS_REGION:us-east-1}
   application:
     name: radar-ingestion
   threads:
@@ -9,6 +17,8 @@ spring:
     banner-mode: off
 
 radar:
+  queues:
+    procurement-discovered: ${RADAR_PROCUREMENT_QUEUE:radar-procurement-discovered}
   discovery:
     # Overlaps the schedule deliberately rather than matching it. A run that looks back exactly as
     # far as the interval loses everything published during an outage, and re-reading a day costs

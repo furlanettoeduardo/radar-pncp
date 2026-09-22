@@ -14,7 +14,23 @@
   <name>radar-ingestion</name>
   <description>PNCP client, scheduler, SQS producer and consumer, LLM enrichment.</description>
 
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>io.awspring.cloud</groupId>
+        <artifactId>spring-cloud-aws-dependencies</artifactId>
+        <version>${spring-cloud-aws.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
   <dependencies>
+    <dependency>
+      <groupId>io.awspring.cloud</groupId>
+      <artifactId>spring-cloud-aws-starter-sqs</artifactId>
+    </dependency>
     <dependency>
       <groupId>io.github.furlanettoeduardo</groupId>
       <artifactId>radar-domain</artifactId>
@@ -61,9 +77,25 @@
       <version>${wiremock.version}</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>localstack</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <properties>
+    <!--
+      spring-cloud-aws 3.x, not 4.x: 4.x targets Spring Boot 4 and this project is pinned to 3.5.
+      Measured cost of adding it, one process, -Xmx256m, 25s after start: +23.0 MiB RSS and
+      +11.8 MB on the jar. See docs/configuration.md.
+    -->
+    <spring-cloud-aws.version>3.4.0</spring-cloud-aws.version>
     <resilience4j.version>2.4.0</resilience4j.version>
     <wiremock.version>3.13.2</wiremock.version>
   </properties>

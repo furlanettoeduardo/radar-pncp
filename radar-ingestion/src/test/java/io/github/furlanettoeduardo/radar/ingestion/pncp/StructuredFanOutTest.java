@@ -159,17 +159,27 @@ class StructuredFanOutTest {
     assertThat(started).isNotEmpty();
   }
 
+  /**
+   * An earlier version of this test asserted that at most {@code cap} jobs ever entered work, on
+   * the assumption that the failing job would be among the first to take a permit. Forking is
+   * ordered; <em>acquiring</em> is not. When the failing job lost the race for a permit, later jobs
+   * ran a full 300ms each before it ever failed, and the assertion broke about one run in five.
+   *
+   * <p>What the latch actually promises is ordering-independent: once a failure is recorded, jobs
+   * that have not started are abandoned rather than run. So the assertion is that most of the batch
+   * never ran, which is true however the permits were handed out.
+   */
   @Test
-  @DisplayName("once one job has failed, no further job starts work")
-  void noFurtherJobStartsWorkAfterTheFirstFailure() {
-    int cap = 2;
+  @DisplayName("a failure abandons the rest of the batch instead of working through it")
+  void aFailureAbandonsTheRestOfTheBatch() {
+    int jobs = 40;
     Set<Integer> enteredWork = ConcurrentHashMap.newKeySet();
 
     assertThatThrownBy(
             () ->
-                new StructuredFanOut(cap, Duration.ofSeconds(30))
+                new StructuredFanOut(2, Duration.ofSeconds(30))
                     .runAll(
-                        IntStream.rangeClosed(1, 40).boxed().toList(),
+                        IntStream.rangeClosed(1, jobs).boxed().toList(),
                         input -> {
                           if (input == 1) {
                             sleep(Duration.ofMillis(50));
@@ -182,10 +192,9 @@ class StructuredFanOutTest {
                         }))
         .isInstanceOf(PncpUnavailableException.class);
 
-    // Only jobs already holding a permit when the failure landed may have started.
     assertThat(enteredWork)
-        .as("jobs that started work after the upstream was known to be down")
-        .hasSizeLessThanOrEqualTo(cap);
+        .as("jobs that did work against an upstream already known to be down")
+        .hasSizeLessThan(jobs / 2);
   }
 
   private static StructuredFanOut fanOut(int maxConcurrent) {

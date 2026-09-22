@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 /**
  * Finds what PNCP published recently and hands each notice to the queue.
@@ -20,13 +21,11 @@ import org.slf4j.LoggerFactory;
  * same reason the scoring engine takes one: a job that reads the clock cannot be tested against a
  * date boundary, and this one has a date boundary that matters.
  *
- * <p>Not a Spring bean yet: it is wired in the cycle that introduces a publisher, because a bean
- * whose collaborator does not exist stops the context from starting.
- *
  * <p>The window is computed in Brasilia time, not in the JVM default zone. PNCP's {@code
  * dataInicial} and {@code dataFinal} are Brazilian calendar dates, so a container running in UTC
  * would ask for tomorrow for three hours every evening.
  */
+@Component
 public final class ProcurementDiscoveryJob {
 
   private static final Logger LOG = LoggerFactory.getLogger(ProcurementDiscoveryJob.class);
