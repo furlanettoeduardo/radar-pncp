@@ -59,6 +59,30 @@ and must not treat a failed run as an empty day.
 These four breaker values are smaller than Resilience4j's defaults (100 / 100 / 50% / 60s) because
 per-invocation call volume here is low. That reasoning is sound and the numbers are still taste.
 
+### Considered and deferred: lowering `minimumNumberOfCalls`
+
+Raised on 2026-09-22 and deliberately not done.
+
+At 10, the breaker cannot open until ten calls have been recorded. The breaker sits inside the
+retry, so each attempt counts, and eight concurrent page fetches reach ten around their second
+attempt — by which point the fan out has usually already cancelled itself, because the first job to
+exhaust its retries kills the run. **Within a single invocation the breaker opens at roughly the
+moment it has stopped mattering.** Lowering it to about 4 would make it bite during a fan out
+rather than after one.
+
+It was deferred because of what it trades. A genuinely isolated blip — one page, one bad moment —
+would trip the breaker, and with a 30 second open window that turns one failed page into one
+skipped invocation. **It converts a partial failure into a total one**, and there is no evidence
+yet about how PNCP actually fails: whether its bad moments are isolated or wholesale. The
+observation above is a single data point of the wholesale kind.
+
+Across invocations the breaker already works well, which is the case that matters most once a
+scheduler is driving this: the client is a singleton, so a run a minute after a failure finds the
+circuit open and fails immediately instead of repeating the discovery.
+
+Revisit when there is production evidence about the shape of PNCP's failures. Until then this is a
+decision on record rather than an untouched default.
+
 ## Scoring — the domain
 
 | Setting | Value | Label | Basis |

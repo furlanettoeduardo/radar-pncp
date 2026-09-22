@@ -2,6 +2,7 @@ package io.github.furlanettoeduardo.radar.ingestion.pncp;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.core.IntervalFunction;
@@ -38,6 +39,11 @@ import org.springframework.web.client.RestClient;
  * <p>A 204 is an empty page, not a failure. PNCP answers that way for a query matching nothing, as
  * the recorded {@code caso-vazio} sample shows, and treating it as an error would make an ordinary
  * quiet day look like an outage.
+ *
+ * <p>An open circuit is reported as {@link PncpUnavailableException} like any other form of "PNCP
+ * is not answering". Resilience4j's own exception is deliberately not allowed to escape: callers
+ * branch on this adapter's three failure types, and a fourth one appearing only when a breaker
+ * opens would surface for the first time in production.
  *
  * <p>Resilience4j is applied programmatically rather than through its annotations. The annotations
  * work through Spring AOP proxies, and these calls are made from inside virtual thread subtasks
@@ -97,8 +103,16 @@ public final class PncpPageClient {
 
   public PncpPage fetch(PncpPageRequest request) {
     Supplier<PncpPage> once = () -> fetchOnce(request);
-    return Retry.decorateSupplier(retry, CircuitBreaker.decorateSupplier(circuitBreaker, once))
-        .get();
+    try {
+      return Retry.decorateSupplier(retry, CircuitBreaker.decorateSupplier(circuitBreaker, once))
+          .get();
+    } catch (CallNotPermittedException open) {
+      // An open circuit is still "PNCP is not answering", and callers already branch on that.
+      // Letting a Resilience4j type escape would hand them a class this adapter never mentions
+      // anywhere else, the first time it happens, in production.
+      throw new PncpUnavailableException(
+          "the PNCP circuit breaker is open after repeated failures, so no request was made", open);
+    }
   }
 
   private PncpPage fetchOnce(PncpPageRequest request) {

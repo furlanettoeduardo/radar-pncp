@@ -234,6 +234,27 @@ class PncpPageClientTest {
     PNCP.verify(3, getRequestedFor(urlPathEqualTo(PUBLICATION_PATH)));
   }
 
+  @Test
+  @DisplayName("an open circuit surfaces as the adapter's own exception, not a Resilience4j one")
+  void anOpenCircuitIsReportedAsUnavailable() {
+    PNCP.stubFor(get(urlPathEqualTo(PUBLICATION_PATH)).willReturn(aResponse().withStatus(503)));
+    PncpPageClient client = clientWith(properties());
+
+    // Drive the breaker open: each fetch is three recorded calls, and it opens at ten.
+    for (int attempt = 0; attempt < 4; attempt++) {
+      assertThatThrownBy(() -> client.fetch(firstPage()))
+          .isInstanceOf(PncpUnavailableException.class);
+    }
+    int requestsBeforeTheCircuitOpened = PNCP.getServeEvents().getRequests().size();
+
+    assertThatThrownBy(() -> client.fetch(firstPage()))
+        .isInstanceOf(PncpUnavailableException.class)
+        .hasMessageContaining("circuit breaker is open");
+
+    // Fails fast: an open circuit must not reach PNCP at all.
+    assertThat(PNCP.getServeEvents().getRequests()).hasSize(requestsBeforeTheCircuitOpened);
+  }
+
   private static com.github.tomakehurst.wiremock.matching.StringValuePattern absentQueryParam() {
     return com.github.tomakehurst.wiremock.client.WireMock.absent();
   }
