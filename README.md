@@ -6,9 +6,11 @@ enriches them with an LLM, and matches them against company profiles.
 Two Spring Boot services, one t3.micro, inside the AWS free tier. The constraint is the point:
 every dependency and every AWS service in this repository had to earn its place in 1 GB of RAM.
 
-> **Status: stage 01, foundation.** The build, the module boundaries and the deployment shape
-> exist and are tested. No business logic yet. See
-> [docs/architecture.md](docs/architecture.md) for what is built and what is planned.
+> **Status: stage 02 complete, the domain model.** The build, the module boundaries, the domain
+> model, the scoring engine and the ports exist and are tested. No adapters yet: nothing talks to
+> PNCP, a database or an LLM, and the three ports the domain declares have no implementations.
+> Stage 03 is next. See [docs/architecture.md](docs/architecture.md) for what is built and what is
+> planned, and [docs/adr](docs/adr) for why.
 
 ## Stack
 
@@ -80,6 +82,7 @@ migrations.
 - [Architecture and current state](docs/architecture.md)
 - [Architecture decision records](docs/adr)
 - [Contributing](CONTRIBUTING.md) — branches, commits, TDD, definition of done
+- [How matching works](docs/adr/0005-scoring-weights-disqualification-and-time.md) — weights, disqualification and time
 - [PNCP API samples](docs/samples) — recorded responses the client is written against
 
 ## License
