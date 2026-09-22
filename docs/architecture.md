@@ -44,17 +44,18 @@ flowchart LR
     classDef planned stroke-dasharray:6 4,stroke-width:1.5px;
 
     class API,PG built;
-    class ING,PNCP,LLM,SQS,DLQ,DDB,CLIENT planned;
+    class ING,PNCP built;
+    class LLM,SQS,DLQ,DDB,CLIENT planned;
 ```
 
-## What exists today, after stage 02
+## What exists today, after stage 03
 
 | Component | State | Evidence |
 | --- | --- | --- |
-| `radar-domain` | Model, five scoring rules, scoring engine, three ports | 61 tests, including seeded invariants for the 0-100 bound and determinism |
+| `radar-domain` | Model, five scoring rules, scoring engine, three ports | 71 tests, including seeded invariants for the 0-100 bound and determinism |
 | `radar-shared` | Empty on purpose, purity enforced | `SharedContractsPurityTest`, enforcer `enforce-shared-purity` |
 | `radar-api` | Boots, Flyway migrates, actuator answers | `RadarApiApplicationIT`, 4 tests against real PostgreSQL 16 |
-| `radar-ingestion` | Boots, actuator answers | `RadarIngestionApplicationTest`, 3 tests |
+| `radar-ingestion` | PNCP adapter: fetches, maps, bounded fan out | 66 tests, including a live smoke test run manually against real PNCP |
 | PostgreSQL 16 | Running in `docker-compose.yml`, one smoke migration | `V1__create_schema_version_smoke_table.sql` |
 
 ### Measured footprint
@@ -76,9 +77,9 @@ The domain is framework free and enforced twice, by the maven-enforcer-plugin on
 tree and by `DomainPurityTest` on the imports. Both checks now run against real classes rather
 than an empty module.
 
-Not started: the PNCP client, the scheduler, SQS and its dead letter queue, LLM enrichment, the
-DynamoDB cache, persistence of any kind, GraphQL, auth and the EC2 deployment. The three ports
-the domain needs are declared and have no implementations anywhere.
+Not started: the scheduler, SQS and its dead letter queue, LLM enrichment, the DynamoDB cache,
+persistence of any kind, GraphQL, auth and the EC2 deployment. `ProcurementSource` is implemented;
+`MatchRepository` and `EnrichmentProvider` are still declarations with no implementation anywhere.
 
 ## Constraints that shape the design
 

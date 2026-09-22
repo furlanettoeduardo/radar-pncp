@@ -6,16 +6,19 @@ enriches them with an LLM, and matches them against company profiles.
 Two Spring Boot services, one t3.micro, inside the AWS free tier. The constraint is the point:
 every dependency and every AWS service in this repository had to earn its place in 1 GB of RAM.
 
-> **Status: stage 02 complete, the domain model.** The build, the module boundaries, the domain
-> model, the scoring engine and the ports exist and are tested. No adapters yet: nothing talks to
-> PNCP, a database or an LLM, and the three ports the domain declares have no implementations.
-> Stage 03 is next. See [docs/architecture.md](docs/architecture.md) for what is built and what is
-> planned, and [docs/adr](docs/adr) for why.
+> **Status: stage 03 complete, the PNCP adapter.** The build, the module boundaries, the domain
+> model, the scoring engine and the PNCP HTTP adapter exist and are tested. The adapter fetches and
+> maps real notices, bounded by a concurrency cap, a fan-out cap and a whole-operation deadline.
+> Nothing is persisted, queued or enriched yet: two of the three ports the domain declares still
+> have no implementation. Stage 04 is next. See [docs/architecture.md](docs/architecture.md) for
+> what is built and what is planned, [docs/configuration.md](docs/configuration.md) for which of
+> the numbers are evidence, and [docs/adr](docs/adr) for why.
 
 ## Stack
 
-Java 21 · Spring Boot 3.5 · PostgreSQL 16 · Flyway · Maven multi-module · Docker Compose ·
-JUnit 5, AssertJ, ArchUnit, Testcontainers
+Java 21 · Spring Boot 3.5 · PostgreSQL 16 · Flyway · Resilience4j · virtual threads and structured
+concurrency · Maven multi-module · Docker Compose · JUnit 5, AssertJ, ArchUnit, Testcontainers,
+WireMock
 
 ## Modules
 
