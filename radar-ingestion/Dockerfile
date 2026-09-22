@@ -34,5 +34,7 @@ WORKDIR /app
 COPY --from=build /workspace/radar-ingestion/target/radar-ingestion-*.jar /app/radar-ingestion.jar
 USER radar
 EXPOSE 8081
-ENV JAVA_TOOL_OPTIONS="-Xmx256m"
+# --enable-preview is required at run time too: StructuredTaskScope is a preview API in
+# Java 21 and preview classfiles refuse to load without it. See docs/adr/0008.
+ENV JAVA_TOOL_OPTIONS="-Xmx256m --enable-preview"
 ENTRYPOINT ["java", "-jar", "/app/radar-ingestion.jar"]
