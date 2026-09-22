@@ -36,4 +36,17 @@ public record Match(
     }
     reasons = List.copyOf(reasons);
   }
+
+  /**
+   * Whether this score will change on its own.
+   *
+   * <p>True when some rule is still waiting for an input a worker has yet to produce, which today
+   * means an unenriched procurement. Derived from the breakdown rather than stored, so a consumer
+   * that does not care can ignore it and lose nothing but an explanation.
+   *
+   * <p>A hidden budget does not make a match provisional. That input is never arriving.
+   */
+  public boolean provisional() {
+    return reasons.stream().anyMatch(reason -> reason.outcome() instanceof RuleOutcome.Pending);
+  }
 }

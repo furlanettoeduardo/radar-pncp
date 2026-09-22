@@ -60,13 +60,13 @@ class StateMatchRuleTest {
   }
 
   @Test
-  @DisplayName("is not applicable when the profile names no states, since it cannot discriminate")
-  void isNotApplicableWhenTheProfileNamesNoStates() {
+  @DisplayName("is unavailable when the profile names no states, since it cannot discriminate")
+  void isUnavailableWhenTheProfileNamesNoStates() {
     ScoringSubject subject =
         ScoringSubject.unenriched(aProcurement().in(BrazilianState.SP).build());
 
     RuleOutcome outcome = rule.evaluate(subject, aProfile().in().build(), NOW);
 
-    assertThat(outcome).isInstanceOf(RuleOutcome.NotApplicable.class);
+    assertThat(outcome).isInstanceOf(RuleOutcome.Unavailable.class);
   }
 }

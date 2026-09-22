@@ -25,8 +25,9 @@ import java.util.stream.Collectors;
  * confidence should not weigh the same as one the model was certain of, and carrying a confidence
  * only to ignore it would be worse than not carrying one.
  *
- * <p>Before enrichment arrives the rule is not applicable, which is the honest answer: the
- * criterion was not evaluated, the procurement did not fail it.
+ * <p>Before enrichment arrives the rule is pending rather than unavailable. The distinction matters
+ * downstream: a pending criterion means this score will change on its own once a worker runs, and
+ * the match says so.
  */
 public final class SegmentMatchRule implements ScoringRule {
 
@@ -39,13 +40,13 @@ public final class SegmentMatchRule implements ScoringRule {
   public RuleOutcome evaluate(ScoringSubject subject, SearchProfile profile, Instant evaluatedAt) {
     List<Cnae> cnaes = profile.cnaes();
     if (cnaes.isEmpty()) {
-      return new RuleOutcome.NotApplicable(
+      return new RuleOutcome.Unavailable(
           "the profile declares no CNAEs, so no segment can be derived for the company");
     }
 
     Optional<Enrichment> enrichment = subject.enrichment();
     if (enrichment.isEmpty()) {
-      return new RuleOutcome.NotApplicable(
+      return new RuleOutcome.Pending(
           "the procurement has not been enriched, so its segment is unknown");
     }
 

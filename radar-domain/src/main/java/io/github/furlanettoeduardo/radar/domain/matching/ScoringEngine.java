@@ -56,7 +56,8 @@ public final class ScoringEngine {
         points += earned;
         contributed = (int) Math.round(earned);
       }
-      if (!(outcome instanceof RuleOutcome.NotApplicable)) {
+      if (!(outcome instanceof RuleOutcome.Unavailable)
+          && !(outcome instanceof RuleOutcome.Pending)) {
         coverage += weight;
       }
       breakdown.add(new MatchReason(rule.id(), outcome, contributed));

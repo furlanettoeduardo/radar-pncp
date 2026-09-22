@@ -33,10 +33,28 @@ public sealed interface RuleOutcome {
     }
   }
 
-  /** The rule could not run because an input it needs is absent. Contributes nothing. */
-  record NotApplicable(String reason) implements RuleOutcome {
+  /**
+   * The rule could not run because an input it needs does not exist and will not appear on its own.
+   * A hidden budget is the example: that is simply what the procurement is, and the score is final.
+   */
+  record Unavailable(String reason) implements RuleOutcome {
 
-    public NotApplicable {
+    public Unavailable {
+      requireReason(reason);
+    }
+  }
+
+  /**
+   * The rule could not run because an input it needs does not exist <em>yet</em>. An unenriched
+   * procurement is the example: no worker has produced its segment, and tomorrow the same
+   * procurement scores differently with nothing in the world having changed.
+   *
+   * <p>Kept apart from {@link Unavailable} because the two look identical in a score and mean
+   * opposite things to somebody deciding whether to act now.
+   */
+  record Pending(String reason) implements RuleOutcome {
+
+    public Pending {
       requireReason(reason);
     }
   }
