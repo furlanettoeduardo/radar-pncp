@@ -179,8 +179,15 @@ class ProcurementIngestionTest {
         .hasMessageContaining("3");
   }
 
+  /**
+   * Supplementary evidence, not proof. The barrier releases both threads together but nothing
+   * forces them to interleave at the moment that matters, so this passes whether or not they
+   * actually contended. The two forced-interleaving tests above are the proof; this one is here to
+   * catch anything that only shows up under real threads.
+   */
   @Test
-  @DisplayName("two consumers racing conflicting versions leave the newer one stored")
+  @DisplayName(
+      "supplementary: two consumers racing conflicting versions leave the newer one stored")
   void racingConsumersLeaveTheNewerVersionStored() throws Exception {
     Procurement older = aProcurement().hashed("older").updatedAt(EARLIER).build();
     Procurement newer = aProcurement().hashed("newer").updatedAt(LATER).build();

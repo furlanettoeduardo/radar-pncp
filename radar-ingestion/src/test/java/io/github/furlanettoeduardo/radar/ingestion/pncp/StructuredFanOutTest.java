@@ -81,6 +81,12 @@ class StructuredFanOutTest {
     assertThat(highWaterMark.get()).isEqualTo(cap);
   }
 
+  /**
+   * Supplementary evidence, not proof. The threads are released together by a barrier, but nothing
+   * forces them to interleave at the moment that matters, so this passes whether or not they
+   * actually contended. The forced-interleaving tests above are what prove the behaviour; this one
+   * exists to catch anything that only breaks under real concurrency.
+   */
   @Test
   @DisplayName("every started subtask has terminated by the time the failure propagates")
   void everyStartedSubtaskTerminatesBeforeTheFailurePropagates() {

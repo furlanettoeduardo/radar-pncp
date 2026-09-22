@@ -84,6 +84,21 @@ No part of this path uses `double`, here or in the adapter that reads the payloa
 as `BigDecimal` through one shared reader, because reading a monetary value through a double loses
 the literal PNCP sent before anything downstream can normalise it.
 
+### One hash is not two hashes
+
+This hash is a **version token**: it answers "has this notice changed in any way", so it covers the
+whole payload including `dataAtualizacaoGlobal`. That is exactly right for deciding whether to store
+a row, and exactly wrong for the enrichment cache stage 5 will need.
+
+An LLM extraction depends only on the notice **text** — the object, and whatever else is fed to the
+model. Keying that cache on this hash would invalidate it whenever PNCP touched a metadata field
+that the model never saw, and spend quota re-extracting an identical text. Model calls are the main
+variable cost in this system, so that is not a small waste.
+
+**The extraction cache key will therefore be a separate hash, over the notice text only.** Recorded
+here rather than in stage 5 because the mistake is easy to make once this hash already exists and
+looks reusable.
+
 ### Consequences
 
 - Good, because reformatting upstream costs nothing and a real change is still detected.
