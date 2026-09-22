@@ -51,9 +51,6 @@ public final class PncpPageClient {
   private static final DateTimeFormatter PNCP_DATE =
       DateTimeFormatter.ofPattern("yyyyMMdd", Locale.ROOT);
 
-  /** Enough of an error body to diagnose from, not enough to fill a disk with. */
-  private static final int MAX_QUOTED_BODY = 500;
-
   private final PncpProperties properties;
   private final RestClient restClient;
   private final Retry retry;
@@ -173,20 +170,8 @@ public final class PncpPageClient {
         envelope.path("numeroPagina").asInt(requestedPage));
   }
 
-  /**
-   * Truncated with a visible marker: an unbounded body in a message or a log fills a small disk.
-   */
   private static String quote(String body) {
-    if (body == null || body.isBlank()) {
-      return "<empty body>";
-    }
-    String collapsed = body.strip();
-    return collapsed.length() <= MAX_QUOTED_BODY
-        ? collapsed
-        : collapsed.substring(0, MAX_QUOTED_BODY)
-            + "... <truncated, "
-            + collapsed.length()
-            + " chars>";
+    return Payloads.quote(body);
   }
 
   private static String quote(InputStream body) {

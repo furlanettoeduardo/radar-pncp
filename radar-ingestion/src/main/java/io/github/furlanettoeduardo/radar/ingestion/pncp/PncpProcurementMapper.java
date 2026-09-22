@@ -9,6 +9,7 @@ import io.github.furlanettoeduardo.radar.domain.procurement.Procurement;
 import java.io.Serial;
 import java.time.Instant;
 import java.util.Optional;
+import org.springframework.stereotype.Component;
 
 /**
  * Turns one PNCP notice into a domain procurement, or explains why it could not.
@@ -41,6 +42,7 @@ import java.util.Optional;
  * AQUISI?AO} is corrupt. Rejecting it loudly here is far cheaper than discovering it in a user
  * interface months later.
  */
+@Component
 public final class PncpProcurementMapper {
 
   private static final char REPLACEMENT_CHARACTER = '�';
