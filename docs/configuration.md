@@ -19,6 +19,7 @@ and [ADR 0008](adr/0008-virtual-threads-and-structured-concurrency-for-page-fetc
 | `connect-timeout` | `2s` | **Guess** | No latency measurement. Convention. |
 | `read-timeout` | `10s` | **Guess** | Same. The sample headers carry `fetched-at` but no duration, so no observed PNCP latency exists anywhere in this repository. |
 | `operation-deadline` | `5m` | **Guess, with arithmetic behind it** | A healthy run at the cap is about 500 pages over 8 at a time, roughly a minute; this leaves five times that. The number it is protecting against is real: 500 pages × 3 attempts × a 10s read timeout is over half an hour for one invocation. |
+| `--enable-preview` | on the Dockerfile `ENTRYPOINT` | **Not a tunable** | `StructuredTaskScope` is a preview API in Java 21 and the image cannot run without the flag. Deliberately *not* in `JAVA_TOOL_OPTIONS`: docker compose sets that variable and replaced it wholesale, which stripped the flag and broke startup once. An entrypoint is the one place no orchestrator clobbers by accident. Guarded by `PreviewFlagWiringTest` at build time and `PreviewFeatures.requireEnabled()` at boot. See [ADR 0008](adr/0008-virtual-threads-and-structured-concurrency-for-page-fetching.md). |
 | `user-agent` | project + repo URL | n/a | Not a tunable. PNCP is run by a public body and being identifiable costs nothing. |
 
 ## Resilience — hardcoded in `PncpPageClient`

@@ -72,9 +72,12 @@
     <plugins>
       <!--
         StructuredTaskScope is a preview API in Java 21, so the flag is needed at compile time and
-        at run time. Three places carry it: here, the test JVMs below, and JAVA_TOOL_OPTIONS in the
-        Dockerfile. Miss one and the failure is a NoClassDefFoundError at startup, not a build
-        error. See docs/adr/0008.
+        at run time. Three places carry it: here, the test JVMs below, and the Dockerfile
+        ENTRYPOINT. It is deliberately NOT in JAVA_TOOL_OPTIONS: docker compose sets that variable
+        and replaced it wholesale, which stripped the flag and broke startup. Miss one and the
+        failure is a class loading error at startup, not a build error, which is why
+        PreviewFlagWiringTest asserts these three and PreviewFeatures checks at boot.
+        See docs/adr/0008.
       -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

@@ -56,9 +56,58 @@ over work that never contended would pass while proving nothing.
 ## The preview API, stated plainly
 
 `StructuredTaskScope` is a **preview API in Java 21** (JEP 453). It requires `--enable-preview` at
-compile time and at run time, in three places: the compiler plugin, both test JVMs, and
-`JAVA_TOOL_OPTIONS` in the Dockerfile. Missing one produces a `NoClassDefFoundError` at startup
-rather than a build failure, which is why the POM carries a comment naming all three.
+compile time and at run time.
+
+### It was three places. It was four.
+
+This document originally said the flag lived in three places: the compiler plugin, both test JVMs,
+and `JAVA_TOOL_OPTIONS` in the Dockerfile. That was wrong in a way that only shows up at runtime.
+
+`docker-compose.yml` also sets `JAVA_TOOL_OPTIONS` for that service, to pin the heap. **Compose
+replaces an image environment variable rather than appending to it**, so the compose value won and
+the flag disappeared. The container logged
+
+```
+Picked up JAVA_TOOL_OPTIONS: -Xmx256m
+```
+
+and the service failed to start, surfacing as an `UnsupportedClassVersionError` wrapped in a
+`BeanCreationException` while the bean graph was being built — thirty frames deep, naming a class
+nobody was thinking about, for one missing word on a command line. Every test passed. The build was
+green. This is the cost of the preview API, and it is not theoretical.
+
+### Where the flag lives now, and why there
+
+**On the Dockerfile `ENTRYPOINT`**, not in any environment variable:
+
+```dockerfile
+ENTRYPOINT ["java", "--enable-preview", "-jar", "/app/radar-ingestion.jar"]
+```
+
+The reasoning is about who can reach it. `--enable-preview` is **not a tunable**: the image cannot
+run without it. An environment variable can be replaced wholesale by every layer above the image —
+compose did, Kubernetes will, `docker run -e` would — and each of those replacements is silent. The
+entrypoint is the only place none of them can clobber by accident. The heap stays in
+`JAVA_TOOL_OPTIONS`, where an orchestrator overriding it is somebody's intent rather than a silent
+amputation.
+
+So: **three places, and none of them an environment variable.** The compiler plugin, both test JVMs,
+and the entrypoint.
+
+### Two guards, because a comment was not enough
+
+The original mistake was documented in a comment in the POM, and the comment was wrong. Comments do
+not fail builds.
+
+- **`PreviewFlagWiringTest`** asserts at build time that the flag is on the `ENTRYPOINT`, that it is
+  *not* in `ENV JAVA_TOOL_OPTIONS`, that compose does not override the entrypoint, and that the POM
+  carries it for the compiler and both test JVMs. Reintroducing the original bug makes two of these
+  fail.
+- **`PreviewFeatures.requireEnabled()`** runs before `SpringApplication.run` and loads the one
+  preview-compiled class deliberately. If the flag is missing it throws one sentence naming the
+  flag, the three places, and this document — instead of a class-loading error inside a bean graph.
+  It tests the condition rather than a proxy for it: reading `getInputArguments` would only tell you
+  what was passed, not whether it worked.
 
 **The API finalises in Java 25**, and it does not finalise in the shape Java 21 has. The Java 21
 form, `new StructuredTaskScope.ShutdownOnFailure()` with `throwIfFailed`, is replaced by
@@ -108,3 +157,7 @@ nothing about it looked wrong when read back.
 - Bad, because a JDK upgrade past 21 requires rewriting `StructuredFanOut`.
 - Bad, because `--enable-preview` in production is unusual, and a reader who does not know why will
   assume carelessness. That is what this document is for.
+- Bad, and demonstrated rather than predicted: the flag has to be right in three places, a green
+  build proves nothing about two of them, and getting it wrong fails at startup with a stack trace
+  that points nowhere near the cause. Two guards now cover that, and neither existed until the
+  mistake had already been made in a running container.
