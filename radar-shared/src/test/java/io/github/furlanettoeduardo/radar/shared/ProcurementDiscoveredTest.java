@@ -43,6 +43,70 @@ class ProcurementDiscoveredTest {
   }
 
   @Test
+  @DisplayName(
+      "the timestamp must be a canonical UTC instant, which is the whole point of a string")
+  void acceptsOnlyACanonicalUtcInstant() {
+    assertThat(
+            ProcurementDiscovered.of(CONTROL_NUMBER, HASH, "2026-09-01T17:22:01Z", PAYLOAD)
+                .sourceUpdatedAt())
+        .isEqualTo("2026-09-01T17:22:01Z");
+    assertThat(
+            ProcurementDiscovered.of(CONTROL_NUMBER, HASH, "2026-09-01T17:22:01.500Z", PAYLOAD)
+                .sourceUpdatedAt())
+        .isEqualTo("2026-09-01T17:22:01.500Z");
+  }
+
+  @Test
+  @DisplayName(
+      "a naive timestamp is rejected: it is exactly the shape PNCP publishes and we convert")
+  void rejectsANaiveTimestamp() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () -> ProcurementDiscovered.of(CONTROL_NUMBER, HASH, "2026-09-01T17:22:01", PAYLOAD))
+        .withMessageContaining("2026-09-01T17:22:01");
+  }
+
+  @Test
+  @DisplayName("epoch seconds are rejected, whatever a serializer might prefer")
+  void rejectsEpochSeconds() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> ProcurementDiscovered.of(CONTROL_NUMBER, HASH, "1756747321", PAYLOAD));
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () -> ProcurementDiscovered.of(CONTROL_NUMBER, HASH, "1756747321.000000000", PAYLOAD));
+  }
+
+  @Test
+  @DisplayName("a non-UTC offset is rejected: the same instant must have exactly one spelling")
+  void rejectsANonUtcOffset() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                ProcurementDiscovered.of(
+                    CONTROL_NUMBER, HASH, "2026-09-01T14:22:01-03:00", PAYLOAD));
+  }
+
+  @Test
+  @DisplayName("a one-digit fraction is rejected: Java renders fractions in groups of three")
+  void rejectsANonCanonicalFractionWidth() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                ProcurementDiscovered.of(CONTROL_NUMBER, HASH, "2026-09-01T17:22:01.5Z", PAYLOAD));
+  }
+
+  @Test
+  @DisplayName(
+      "padded fractional zeros are rejected, since they are a second spelling of one instant")
+  void rejectsNonCanonicalFractionalZeros() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                ProcurementDiscovered.of(
+                    CONTROL_NUMBER, HASH, "2026-09-01T17:22:01.000Z", PAYLOAD));
+  }
+
+  @Test
   @DisplayName("a message without an identity cannot be acted on")
   void rejectsABlankControlNumber() {
     assertThatIllegalArgumentException()
