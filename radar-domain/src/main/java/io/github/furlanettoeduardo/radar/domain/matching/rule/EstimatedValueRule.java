@@ -28,12 +28,12 @@ public final class EstimatedValueRule implements ScoringRule {
   public RuleOutcome evaluate(ScoringSubject subject, SearchProfile profile, Instant evaluatedAt) {
     Optional<ValueRange> range = profile.valueRange();
     if (range.isEmpty()) {
-      return new RuleOutcome.NotApplicable("the profile declares no value range");
+      return new RuleOutcome.Unavailable("the profile declares no value range");
     }
 
     Optional<MonetaryValue> estimated = subject.procurement().estimatedValue();
     if (estimated.isEmpty()) {
-      return new RuleOutcome.NotApplicable(
+      return new RuleOutcome.Unavailable(
           "the procurement carries no estimated value, the budget is secret");
     }
 

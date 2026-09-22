@@ -81,8 +81,8 @@ class EstimatedValueRuleTest {
   }
 
   @Test
-  @DisplayName("is not applicable when PNCP hid the budget, rather than scoring it as zero")
-  void isNotApplicableWhenTheBudgetIsSecret() {
+  @DisplayName("is unavailable when PNCP hid the budget, rather than scoring it as zero")
+  void isUnavailableWhenTheBudgetIsSecret() {
     ScoringSubject subject = ScoringSubject.unenriched(aProcurement().withSecretBudget().build());
 
     RuleOutcome outcome =
@@ -90,17 +90,17 @@ class EstimatedValueRuleTest {
 
     assertThat(outcome)
         .isInstanceOfSatisfying(
-            RuleOutcome.NotApplicable.class,
-            notApplicable -> assertThat(notApplicable.reason()).contains("no estimated value"));
+            RuleOutcome.Unavailable.class,
+            unavailable -> assertThat(unavailable.reason()).contains("no estimated value"));
   }
 
   @Test
-  @DisplayName("is not applicable when the profile declares no value range")
-  void isNotApplicableWhenTheProfileHasNoRange() {
+  @DisplayName("is unavailable when the profile declares no value range")
+  void isUnavailableWhenTheProfileHasNoRange() {
     ScoringSubject subject = ScoringSubject.unenriched(aProcurement().worth("50000").build());
 
     RuleOutcome outcome = rule.evaluate(subject, aProfile().build(), NOW);
 
-    assertThat(outcome).isInstanceOf(RuleOutcome.NotApplicable.class);
+    assertThat(outcome).isInstanceOf(RuleOutcome.Unavailable.class);
   }
 }

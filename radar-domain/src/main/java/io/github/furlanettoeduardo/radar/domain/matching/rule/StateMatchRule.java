@@ -29,7 +29,7 @@ public final class StateMatchRule implements ScoringRule {
   public RuleOutcome evaluate(ScoringSubject subject, SearchProfile profile, Instant evaluatedAt) {
     Set<BrazilianState> wanted = profile.states();
     if (wanted.isEmpty()) {
-      return new RuleOutcome.NotApplicable(
+      return new RuleOutcome.Unavailable(
           "the profile names no states, so geography cannot tell procurements apart");
     }
 

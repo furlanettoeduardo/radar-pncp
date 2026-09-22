@@ -33,15 +33,75 @@
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
 
+    <!--
+      Resilience4j core only, not resilience4j-spring-boot3. The Spring integration works through
+      AOP proxies, and a call made from inside a virtual thread subtask does not go through one:
+      the annotations would silently do nothing. Decoration here is programmatic, and the core
+      modules cost a fraction of the heap.
+    -->
+    <dependency>
+      <groupId>io.github.resilience4j</groupId>
+      <artifactId>resilience4j-retry</artifactId>
+      <version>${resilience4j.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.resilience4j</groupId>
+      <artifactId>resilience4j-circuitbreaker</artifactId>
+      <version>${resilience4j.version}</version>
+    </dependency>
+
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.wiremock</groupId>
+      <artifactId>wiremock-standalone</artifactId>
+      <version>${wiremock.version}</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
+
+  <properties>
+    <resilience4j.version>2.4.0</resilience4j.version>
+    <wiremock.version>3.13.2</wiremock.version>
+  </properties>
 
   <build>
     <plugins>
+      <!--
+        StructuredTaskScope is a preview API in Java 21, so the flag is needed at compile time and
+        at run time. Three places carry it: here, the test JVMs below, and JAVA_TOOL_OPTIONS in the
+        Dockerfile. Miss one and the failure is a NoClassDefFoundError at startup, not a build
+        error. See docs/adr/0008.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <parameters>true</parameters>
+          <compilerArgs>
+            <arg>--enable-preview</arg>
+            <arg>-Xlint:all,-serial,-processing,-preview</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <argLine>--enable-preview</argLine>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <configuration>
+          <argLine>--enable-preview</argLine>
+        </configuration>
+      </plugin>
+
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>

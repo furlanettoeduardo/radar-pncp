@@ -90,13 +90,13 @@ class KeywordMatchRuleTest {
   }
 
   @Test
-  @DisplayName("is not applicable when the profile declares no keywords")
-  void isNotApplicableWhenProfileHasNoKeywords() {
+  @DisplayName("is unavailable when the profile declares no keywords")
+  void isUnavailableWhenProfileHasNoKeywords() {
     ScoringSubject subject = describing("Aquisicao de brinquedos pedagogicos");
 
     RuleOutcome outcome = rule.evaluate(subject, withKeywords(), NOW);
 
-    assertThat(outcome).isInstanceOf(RuleOutcome.NotApplicable.class);
+    assertThat(outcome).isInstanceOf(RuleOutcome.Unavailable.class);
   }
 
   @Test

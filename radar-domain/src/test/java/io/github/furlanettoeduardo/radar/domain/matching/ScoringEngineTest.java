@@ -138,11 +138,66 @@ class ScoringEngineTest {
                   .anySatisfy(
                       reason -> {
                         assertThat(reason.rule()).isEqualTo(RuleId.SEGMENT);
-                        assertThat(reason.outcome()).isInstanceOf(RuleOutcome.NotApplicable.class);
+                        assertThat(reason.outcome()).isInstanceOf(RuleOutcome.Pending.class);
                         assertThat(reason.points()).isZero();
                       });
               assertThat(matched.match().evidenceCoverage()).isEqualTo(EvidenceCoverage.of(70));
             });
+  }
+
+  @Test
+  @DisplayName("a match missing only enrichment is provisional: the score will change on its own")
+  void awaitingEnrichmentIsProvisional() {
+    ScoringSubject subject =
+        ScoringSubject.unenriched(
+            aProcurement()
+                .describing("Aquisicao de computadores e servicos de informatica")
+                .in(BrazilianState.SP)
+                .worth("50000")
+                .closingAt(COMFORTABLY_OPEN)
+                .build());
+
+    ScoringResult result = engine.evaluate(subject, perfectProfile(), NOW);
+
+    assertThat(result)
+        .isInstanceOfSatisfying(
+            ScoringResult.Matched.class,
+            matched -> assertThat(matched.match().provisional()).isTrue());
+  }
+
+  @Test
+  @DisplayName("a hidden budget is final, not provisional: no worker will ever fill it in")
+  void aHiddenBudgetIsNotProvisional() {
+    ScoringSubject subject =
+        ScoringSubject.enriched(
+            aProcurement()
+                .describing("Aquisicao de computadores e servicos de informatica")
+                .in(BrazilianState.SP)
+                .withSecretBudget()
+                .closingAt(COMFORTABLY_OPEN)
+                .build(),
+            anEnrichment().forSegment(ProcurementSegment.IT_SERVICES).confident(1.0).build());
+
+    ScoringResult result = engine.evaluate(subject, perfectProfile(), NOW);
+
+    assertThat(result)
+        .isInstanceOfSatisfying(
+            ScoringResult.Matched.class,
+            matched -> {
+              assertThat(matched.match().evidenceCoverage()).isEqualTo(EvidenceCoverage.of(85));
+              assertThat(matched.match().provisional()).isFalse();
+            });
+  }
+
+  @Test
+  @DisplayName("a fully evaluated match is not provisional")
+  void aCompleteMatchIsNotProvisional() {
+    ScoringResult result = engine.evaluate(perfectSubject(), perfectProfile(), NOW);
+
+    assertThat(result)
+        .isInstanceOfSatisfying(
+            ScoringResult.Matched.class,
+            matched -> assertThat(matched.match().provisional()).isFalse());
   }
 
   private static ScoringSubject perfectSubject() {

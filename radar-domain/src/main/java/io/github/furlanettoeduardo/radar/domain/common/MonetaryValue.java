@@ -19,6 +19,11 @@ public record MonetaryValue(BigDecimal amount) implements Comparable<MonetaryVal
     if (amount.signum() < 0) {
       throw new IllegalArgumentException("a monetary value must not be negative but was " + amount);
     }
+    amount = amount.stripTrailingZeros();
+    if (amount.scale() < 0) {
+      // stripTrailingZeros turns 10000 into 1E+4; bring whole numbers back to a plain scale.
+      amount = amount.setScale(0);
+    }
   }
 
   public static MonetaryValue of(String amount) {

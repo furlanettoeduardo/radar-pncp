@@ -55,7 +55,7 @@ public final class KeywordMatchRule implements ScoringRule {
   public RuleOutcome evaluate(ScoringSubject subject, SearchProfile profile, Instant evaluatedAt) {
     List<String> keywords = profile.keywords();
     if (keywords.isEmpty()) {
-      return new RuleOutcome.NotApplicable("the profile declares no keywords");
+      return new RuleOutcome.Unavailable("the profile declares no keywords");
     }
 
     String object = fold(subject.procurement().objectDescription());

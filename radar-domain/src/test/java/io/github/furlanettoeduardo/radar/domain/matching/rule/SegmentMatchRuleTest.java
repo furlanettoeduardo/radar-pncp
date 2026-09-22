@@ -65,21 +65,21 @@ class SegmentMatchRuleTest {
   }
 
   @Test
-  @DisplayName("is not applicable when the procurement has not been enriched yet")
-  void isNotApplicableWithoutEnrichment() {
+  @DisplayName("is pending, not unavailable, when the procurement has not been enriched yet")
+  void isPendingWithoutEnrichment() {
     ScoringSubject subject = ScoringSubject.unenriched(aProcurement().build());
 
     RuleOutcome outcome = rule.evaluate(subject, aProfile().withCnaes("6201-5/01").build(), NOW);
 
     assertThat(outcome)
         .isInstanceOfSatisfying(
-            RuleOutcome.NotApplicable.class,
-            notApplicable -> assertThat(notApplicable.reason()).contains("not been enriched"));
+            RuleOutcome.Pending.class,
+            pending -> assertThat(pending.reason()).contains("not been enriched"));
   }
 
   @Test
-  @DisplayName("is not applicable when the profile declares no CNAEs")
-  void isNotApplicableWithoutCnaes() {
+  @DisplayName("is unavailable when the profile declares no CNAEs, which no worker will fix")
+  void isUnavailableWithoutCnaes() {
     ScoringSubject subject =
         ScoringSubject.enriched(
             aProcurement().build(),
@@ -87,7 +87,7 @@ class SegmentMatchRuleTest {
 
     RuleOutcome outcome = rule.evaluate(subject, aProfile().build(), NOW);
 
-    assertThat(outcome).isInstanceOf(RuleOutcome.NotApplicable.class);
+    assertThat(outcome).isInstanceOf(RuleOutcome.Unavailable.class);
   }
 
   @Test
