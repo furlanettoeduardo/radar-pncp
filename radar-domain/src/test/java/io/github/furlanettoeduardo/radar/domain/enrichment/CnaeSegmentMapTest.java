@@ -22,8 +22,7 @@ class CnaeSegmentMapTest {
   @Test
   @DisplayName("defaults to OTHER for divisions the map does not claim to cover")
   void defaultsToOther() {
-    assertThat(CnaeSegmentMap.segmentOf(Cnae.of("9900-8/00")))
-        .isEqualTo(ProcurementSegment.OTHER);
+    assertThat(CnaeSegmentMap.segmentOf(Cnae.of("9900-8/00"))).isEqualTo(ProcurementSegment.OTHER);
   }
 
   @Test

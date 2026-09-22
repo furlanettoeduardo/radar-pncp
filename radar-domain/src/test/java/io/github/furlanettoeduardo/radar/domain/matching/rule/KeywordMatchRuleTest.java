@@ -105,8 +105,7 @@ class KeywordMatchRuleTest {
     assertThat(rule.evaluate(describing("Aquisicao de brinquedos"), withKeywords("brinquedo"), NOW))
         .isInstanceOf(RuleOutcome.Contributed.class);
     assertThat(
-            rule.evaluate(
-                describing("Aquisicao de computadores"), withKeywords("computador"), NOW))
+            rule.evaluate(describing("Aquisicao de computadores"), withKeywords("computador"), NOW))
         .isInstanceOf(RuleOutcome.Contributed.class);
   }
 
@@ -116,8 +115,7 @@ class KeywordMatchRuleTest {
     assertThat(rule.evaluate(describing("Aquisicao de brinquedo"), withKeywords("brinquedos"), NOW))
         .isInstanceOf(RuleOutcome.Contributed.class);
     assertThat(
-            rule.evaluate(
-                describing("Aquisicao de computador"), withKeywords("computadores"), NOW))
+            rule.evaluate(describing("Aquisicao de computador"), withKeywords("computadores"), NOW))
         .isInstanceOf(RuleOutcome.Contributed.class);
   }
 
@@ -134,7 +132,8 @@ class KeywordMatchRuleTest {
   @DisplayName("irregular Portuguese plurals are a known gap, recorded here rather than implied")
   void doesNotHandleIrregularPlurals() {
     RuleOutcome outcome =
-        rule.evaluate(describing("Aquisicao de materiais escolares"), withKeywords("material"), NOW);
+        rule.evaluate(
+            describing("Aquisicao de materiais escolares"), withKeywords("material"), NOW);
 
     assertThat(outcome).isInstanceOf(RuleOutcome.Silent.class);
   }

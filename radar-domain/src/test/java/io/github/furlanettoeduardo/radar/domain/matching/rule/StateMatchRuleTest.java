@@ -20,7 +20,8 @@ class StateMatchRuleTest {
   @Test
   @DisplayName("contributes full strength when the procurement is in a state the profile wants")
   void contributesWhenTheStateIsWanted() {
-    ScoringSubject subject = ScoringSubject.unenriched(aProcurement().in(BrazilianState.SP).build());
+    ScoringSubject subject =
+        ScoringSubject.unenriched(aProcurement().in(BrazilianState.SP).build());
 
     RuleOutcome outcome =
         rule.evaluate(subject, aProfile().in(BrazilianState.SP, BrazilianState.MG).build(), NOW);
@@ -37,7 +38,8 @@ class StateMatchRuleTest {
   @Test
   @DisplayName("is silent when the procurement is somewhere the profile did not ask for")
   void isSilentWhenTheStateIsNotWanted() {
-    ScoringSubject subject = ScoringSubject.unenriched(aProcurement().in(BrazilianState.AM).build());
+    ScoringSubject subject =
+        ScoringSubject.unenriched(aProcurement().in(BrazilianState.AM).build());
 
     RuleOutcome outcome = rule.evaluate(subject, aProfile().in(BrazilianState.SP).build(), NOW);
 
@@ -49,7 +51,8 @@ class StateMatchRuleTest {
   @Test
   @DisplayName("geography is all or nothing: there is no partial credit for a neighbouring state")
   void hasNoPartialCredit() {
-    ScoringSubject subject = ScoringSubject.unenriched(aProcurement().in(BrazilianState.RJ).build());
+    ScoringSubject subject =
+        ScoringSubject.unenriched(aProcurement().in(BrazilianState.RJ).build());
 
     RuleOutcome outcome = rule.evaluate(subject, aProfile().in(BrazilianState.SP).build(), NOW);
 
@@ -59,7 +62,8 @@ class StateMatchRuleTest {
   @Test
   @DisplayName("is not applicable when the profile names no states, since it cannot discriminate")
   void isNotApplicableWhenTheProfileNamesNoStates() {
-    ScoringSubject subject = ScoringSubject.unenriched(aProcurement().in(BrazilianState.SP).build());
+    ScoringSubject subject =
+        ScoringSubject.unenriched(aProcurement().in(BrazilianState.SP).build());
 
     RuleOutcome outcome = rule.evaluate(subject, aProfile().in().build(), NOW);
 

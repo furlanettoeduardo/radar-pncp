@@ -8,8 +8,8 @@ import java.util.Objects;
  * What a language model concluded about one procurement.
  *
  * <p>Its own aggregate, referencing the procurement by identity rather than living inside it: a
- * different process writes it, at a different time, it can fail, and it can be produced again
- * later without the procurement changing at all.
+ * different process writes it, at a different time, it can fail, and it can be produced again later
+ * without the procurement changing at all.
  */
 public record Enrichment(
     EnrichmentId id,

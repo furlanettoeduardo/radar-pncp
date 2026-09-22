@@ -6,12 +6,12 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * What the scoring engine evaluates. Procurement and enrichment live in separate aggregates
- * because different processes write them at different times; this pairs them for the read that
- * scoring needs, without putting them back together.
+ * What the scoring engine evaluates. Procurement and enrichment live in separate aggregates because
+ * different processes write them at different times; this pairs them for the read that scoring
+ * needs, without putting them back together.
  *
- * <p>An absent enrichment is a normal state, not an error: a procurement is scoreable the moment
- * it is ingested, and the rules that need enrichment report themselves not applicable until it
+ * <p>An absent enrichment is a normal state, not an error: a procurement is scoreable the moment it
+ * is ingested, and the rules that need enrichment report themselves not applicable until it
  * arrives.
  */
 public record ScoringSubject(Procurement procurement, Optional<Enrichment> enrichment) {
