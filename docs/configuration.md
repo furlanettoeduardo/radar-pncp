@@ -45,6 +45,70 @@ wait, retried, exhausted its budget and failed in about 61 seconds, which is thr
 plus backoff. Worth carrying into stage 4: the scheduler must expect an entire invocation to fail,
 and must not treat a failed run as an empty day.
 
+## Discovery — `radar.discovery.*`
+
+| Setting | Default | Label | Basis |
+| --- | --- | --- | --- |
+| `lookback-days` | `2` | **Guess, with a measured cost** | The value is a judgement about how much outage to survive. What it costs is measured, below. |
+| `states` | `[]` (everywhere) | n/a | Empty is what `ProcurementQuery` already expresses and what PNCP accepts as an omitted `uf`. |
+
+### What the lookback overlap actually costs
+
+An earlier note in this repository said re-reading a day "costs nothing, because the consumer
+deduplicates on content hash". **That is true for storage and false for requests**, and the
+difference matters because PNCP is a public API that has already been observed falling over.
+
+Measured volume, from two independent readings:
+
+- `contratacoes/publicacao` reported `totalRegistros: 1697, totalPaginas: 170` for one week of SP;
+- a live run reported `totalRegistros: 1891, totalPaginas: 190` for eight days of SP.
+
+Both give **about 240 SP notices a day, or 24 pages** at `page-size: 10`. The national multiplier of
+roughly 4 to 6 is an estimate from SP's share of Brazilian municipalities, so:
+
+| | pages per run |
+| --- | --- |
+| One day, nationally | 100–160 |
+| **Two days (`lookback-days: 2`)** | **200–320** |
+| The overlap alone, per run | **100–160** |
+
+So the overlap is **100 percent overhead on the minimum**, not a handful of pages. It is still worth
+paying: a single missed run without it loses a day of notices permanently, and a lost notice is the
+one failure this system exists to prevent. But it is a real, recurring cost against somebody else's
+infrastructure and it should be stated as one.
+
+### Why the schedule should be daily, and what sub-daily would cost
+
+**PNCP's query granularity is a calendar date.** `dataInicial` and `dataFinal` are `yyyyMMdd`, so the
+narrowest window obtainable is one whole day. A run at any interval therefore fetches at least a
+full day of pages, and running more often than daily re-fetches the same pages:
+
+| Schedule | Runs per day | Pages per day |
+| --- | --- | --- |
+| **Daily** | 1 | **200–320** |
+| Every 6 hours | 4 | 800–1,280 |
+| Hourly | 24 | 4,800–7,680 |
+
+Sub-daily scheduling multiplies request cost linearly and buys at most one day of freshness, against
+a median proposal window of 14 days. Daily is the interval the API's own granularity argues for.
+
+### The window and the fan-out cap are checked against each other
+
+A lookback wide enough to need more pages than `max-total-pages` would throw on **every** run and
+never once succeed — a configuration deadlock. Two things close it:
+
+- At runtime, `PncpFanOutTooLargeException` already says to narrow the date range rather than raise
+  the cap, so the failure is at least legible.
+- At build time, `DiscoveryWindowFitsTheFanOutCapTest` binds the real configuration and fails if
+  `lookback-days x 160` exceeds the cap, or comes within a 1.5x margin of it. Setting
+  `lookback-days: 4` fails it with *"a 4 day lookback needs about 640 pages at 160 a day, against a
+  cap of 500"*.
+
+**The current margin is thinner than it looks.** At the pessimistic estimate the defaults need 320
+pages of a 500 cap, so the 1.5x margin assertion clears at 480 against 500. Raising `lookback-days`
+to 3, or PNCP volume growing by half, breaks it. That is the intended behaviour — it should break in
+CI rather than at 3am — but it means this pair of numbers is close-coupled and neither moves alone.
+
 ## Resilience — hardcoded in `PncpPageClient`
 
 | Setting | Value | Label |
