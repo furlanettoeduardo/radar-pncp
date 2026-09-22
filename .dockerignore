@@ -1,0 +1,14 @@
+# Keep the build context small: the Dockerfiles build from source inside the image.
+**/target/
+.git/
+.github/
+.idea/
+*.iml
+docs/
+*.md
+!README.md
+docker-compose.yml
+**/Dockerfile
+.dockerignore
+.env
+*.log

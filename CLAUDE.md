@@ -18,12 +18,14 @@ with an LLM, and matches them against company profiles.
 - radar-domain: pure domain model and business rules, zero framework dependencies
 - radar-ingestion: PNCP client, scheduler, SQS producer and consumer, LLM enrichment
 - radar-api: REST controllers, GraphQL, matching queries, auth
-- radar-shared: SQS message contracts, common config
+- radar-shared: message contracts only, no framework. Records, nothing else.
+  If Spring configuration ever needs to be shared, create a radar-spring-support
+  module instead of putting it here.
 
 ## Commands
 - Build: mvn -q clean verify
 - Run locally: docker compose up
-- Integration tests: mvn -q verify -Pintegration (Testcontainers + LocalStack)
+- Integration tests: mvn -q verify -Pintegration (Testcontainers; LocalStack once SQS lands)
 - Lint and format: mvn spotless:apply
 
 ## Conventions
@@ -32,6 +34,9 @@ with an LLM, and matches them against company profiles.
 - Every architectural decision gets an ADR in docs/adr using the MADR format
 - Tests: JUnit 5, AssertJ, Mockito. Integration tests end with *IT, unit tests with *Test
 - No Lombok. Records and explicit code instead.
+- No AI attribution anywhere in the repository. Never add Co-Authored-By trailers,
+  "Generated with Claude Code" lines, tool badges, or any other mention of AI
+  assistance to commits, pull requests, code comments, or docs.
 
 ## What to ask me about instead of guessing
 - Anything that changes the AWS footprint or cost

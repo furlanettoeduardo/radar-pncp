@@ -1,0 +1,70 @@
+# Local development stack. `docker compose up` from a clean clone is enough: both services are
+# built from source inside their images, so no `mvn package` is required first.
+#
+# Memory budget mirrors the t3.micro target: 256 MB heap per JVM, 320 MB per container to leave
+# room for metaspace, thread stacks and direct buffers. In production PostgreSQL does not share
+# the box with the services; here it does, which is why it is capped too.
+name: radar-pncp
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: radar-postgres
+    environment:
+      POSTGRES_DB: radar
+      POSTGRES_USER: radar
+      POSTGRES_PASSWORD: radar
+    ports:
+      # Override when the host already runs something on 5432: RADAR_POSTGRES_PORT=55432
+      - "${RADAR_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U radar -d radar"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    mem_limit: 256m
+
+  radar-api:
+    build:
+      context: .
+      dockerfile: radar-api/Dockerfile
+    container_name: radar-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      RADAR_DB_URL: jdbc:postgresql://postgres:5432/radar
+      RADAR_DB_USERNAME: radar
+      RADAR_DB_PASSWORD: radar
+      JAVA_TOOL_OPTIONS: -Xmx256m
+    ports:
+      - "${RADAR_API_PORT:-8080}:8080"
+    mem_limit: 320m
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+
+  radar-ingestion:
+    build:
+      context: .
+      dockerfile: radar-ingestion/Dockerfile
+    container_name: radar-ingestion
+    environment:
+      JAVA_TOOL_OPTIONS: -Xmx256m
+    ports:
+      - "${RADAR_INGESTION_PORT:-8081}:8081"
+    mem_limit: 320m
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+
+volumes:
+  postgres-data:

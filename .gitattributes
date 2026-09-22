@@ -1,0 +1,14 @@
+# Normalize everything to LF in the repository and in the working tree.
+# The build is cross platform; the formatter is not going to argue about line endings.
+* text=auto eol=lf
+
+*.sh      text eol=lf
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+
+*.jar     binary
+*.png     binary
+*.jpg     binary
+*.gif     binary
+*.ico     binary
+*.pdf     binary
