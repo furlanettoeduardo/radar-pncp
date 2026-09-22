@@ -19,7 +19,7 @@ class EstimatedValueRuleTest {
   @Test
   @DisplayName("contributes full strength when the estimated value sits inside the profile range")
   void contributesWhenTheValueIsInsideTheRange() {
-    ScoringSubject subject = new ScoringSubject(aProcurement().worth("50000.00").build());
+    ScoringSubject subject = ScoringSubject.unenriched(aProcurement().worth("50000.00").build());
 
     RuleOutcome outcome =
         rule.evaluate(subject, aProfile().worthBetween("10000", "100000").build(), NOW);
@@ -33,7 +33,7 @@ class EstimatedValueRuleTest {
   @Test
   @DisplayName("is silent when the contract is too small to be worth pursuing")
   void isSilentBelowTheRange() {
-    ScoringSubject subject = new ScoringSubject(aProcurement().worth("500.00").build());
+    ScoringSubject subject = ScoringSubject.unenriched(aProcurement().worth("500.00").build());
 
     RuleOutcome outcome =
         rule.evaluate(subject, aProfile().worthBetween("10000", "100000").build(), NOW);
@@ -44,7 +44,7 @@ class EstimatedValueRuleTest {
   @Test
   @DisplayName("is silent when the contract is larger than the company can take on")
   void isSilentAboveTheRange() {
-    ScoringSubject subject = new ScoringSubject(aProcurement().worth("2500000.00").build());
+    ScoringSubject subject = ScoringSubject.unenriched(aProcurement().worth("2500000.00").build());
 
     RuleOutcome outcome =
         rule.evaluate(subject, aProfile().worthBetween("10000", "100000").build(), NOW);
@@ -57,13 +57,13 @@ class EstimatedValueRuleTest {
   void boundsAreInclusive() {
     assertThat(
             rule.evaluate(
-                new ScoringSubject(aProcurement().worth("10000").build()),
+                ScoringSubject.unenriched(aProcurement().worth("10000").build()),
                 aProfile().worthBetween("10000", "100000").build(),
                 NOW))
         .isInstanceOf(RuleOutcome.Contributed.class);
     assertThat(
             rule.evaluate(
-                new ScoringSubject(aProcurement().worth("100000").build()),
+                ScoringSubject.unenriched(aProcurement().worth("100000").build()),
                 aProfile().worthBetween("10000", "100000").build(),
                 NOW))
         .isInstanceOf(RuleOutcome.Contributed.class);
@@ -72,7 +72,7 @@ class EstimatedValueRuleTest {
   @Test
   @DisplayName("compares by numeric value, so scale does not change the answer")
   void comparesNumericallyNotByScale() {
-    ScoringSubject subject = new ScoringSubject(aProcurement().worth("10000").build());
+    ScoringSubject subject = ScoringSubject.unenriched(aProcurement().worth("10000").build());
 
     RuleOutcome outcome =
         rule.evaluate(subject, aProfile().worthBetween("10000.00", "100000.00").build(), NOW);
@@ -83,7 +83,7 @@ class EstimatedValueRuleTest {
   @Test
   @DisplayName("is not applicable when PNCP hid the budget, rather than scoring it as zero")
   void isNotApplicableWhenTheBudgetIsSecret() {
-    ScoringSubject subject = new ScoringSubject(aProcurement().withSecretBudget().build());
+    ScoringSubject subject = ScoringSubject.unenriched(aProcurement().withSecretBudget().build());
 
     RuleOutcome outcome =
         rule.evaluate(subject, aProfile().worthBetween("10000", "100000").build(), NOW);
@@ -97,7 +97,7 @@ class EstimatedValueRuleTest {
   @Test
   @DisplayName("is not applicable when the profile declares no value range")
   void isNotApplicableWhenTheProfileHasNoRange() {
-    ScoringSubject subject = new ScoringSubject(aProcurement().worth("50000").build());
+    ScoringSubject subject = ScoringSubject.unenriched(aProcurement().worth("50000").build());
 
     RuleOutcome outcome = rule.evaluate(subject, aProfile().build(), NOW);
 

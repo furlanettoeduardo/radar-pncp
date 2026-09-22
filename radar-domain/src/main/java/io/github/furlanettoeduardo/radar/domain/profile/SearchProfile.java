@@ -1,6 +1,7 @@
 package io.github.furlanettoeduardo.radar.domain.profile;
 
 import io.github.furlanettoeduardo.radar.domain.common.BrazilianState;
+import io.github.furlanettoeduardo.radar.domain.company.Cnae;
 import io.github.furlanettoeduardo.radar.domain.company.CompanyId;
 import java.util.List;
 import java.util.Objects;
@@ -15,6 +16,7 @@ public record SearchProfile(
     SearchProfileId id,
     CompanyId companyId,
     List<String> keywords,
+    List<Cnae> cnaes,
     Set<BrazilianState> states,
     Optional<ValueRange> valueRange) {
 
@@ -29,6 +31,8 @@ public record SearchProfile(
           }
         });
     keywords = List.copyOf(keywords);
+    Objects.requireNonNull(cnaes, "cnaes must not be null, use an empty list instead");
+    cnaes = List.copyOf(cnaes);
     Objects.requireNonNull(states, "states must not be null, use an empty set instead");
     states = Set.copyOf(states);
     Objects.requireNonNull(valueRange, "value range must not be null, use Optional.empty()");

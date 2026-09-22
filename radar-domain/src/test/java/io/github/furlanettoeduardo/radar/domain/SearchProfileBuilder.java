@@ -1,6 +1,7 @@
 package io.github.furlanettoeduardo.radar.domain;
 
 import io.github.furlanettoeduardo.radar.domain.common.BrazilianState;
+import io.github.furlanettoeduardo.radar.domain.company.Cnae;
 import io.github.furlanettoeduardo.radar.domain.company.CompanyId;
 import io.github.furlanettoeduardo.radar.domain.profile.SearchProfile;
 import io.github.furlanettoeduardo.radar.domain.profile.SearchProfileId;
@@ -14,6 +15,7 @@ import java.util.UUID;
 public final class SearchProfileBuilder {
 
   private List<String> keywords = List.of();
+  private List<Cnae> cnaes = List.of();
   private Set<BrazilianState> states = Set.of();
   private Optional<ValueRange> valueRange = Optional.empty();
 
@@ -25,6 +27,11 @@ public final class SearchProfileBuilder {
 
   public SearchProfileBuilder withKeywords(String... keywords) {
     this.keywords = List.of(keywords);
+    return this;
+  }
+
+  public SearchProfileBuilder withCnaes(String... codes) {
+    this.cnaes = java.util.Arrays.stream(codes).map(Cnae::of).toList();
     return this;
   }
 
@@ -43,6 +50,7 @@ public final class SearchProfileBuilder {
         new SearchProfileId(UUID.randomUUID()),
         new CompanyId(UUID.randomUUID()),
         keywords,
+        cnaes,
         states,
         valueRange);
   }

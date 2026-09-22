@@ -89,7 +89,7 @@ class KeywordMatchRuleInvariantsTest {
   private record GeneratedCase(int trial, List<String> keywords, String objectDescription) {
 
     ScoringSubject subject() {
-      return new ScoringSubject(aProcurement().describing(objectDescription).build());
+      return ScoringSubject.unenriched(aProcurement().describing(objectDescription).build());
     }
 
     io.github.furlanettoeduardo.radar.domain.profile.SearchProfile profile() {

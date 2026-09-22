@@ -4,6 +4,7 @@ import io.github.furlanettoeduardo.radar.domain.common.BrazilianState;
 import io.github.furlanettoeduardo.radar.domain.common.MonetaryValue;
 import io.github.furlanettoeduardo.radar.domain.procurement.PncpControlNumber;
 import io.github.furlanettoeduardo.radar.domain.procurement.Procurement;
+import java.time.Instant;
 import java.util.Optional;
 
 /** Test data builder, so growing the Procurement record does not ripple through every test. */
@@ -13,6 +14,7 @@ public final class ProcurementBuilder {
   private String objectDescription = "Aquisicao de brinquedos pedagogicos educativos";
   private BrazilianState state = BrazilianState.SP;
   private Optional<MonetaryValue> estimatedValue = Optional.of(MonetaryValue.of("50000.00"));
+  private Instant proposalClosesAt = Instant.parse("2026-10-20T12:00:00Z");
 
   private ProcurementBuilder() {}
 
@@ -45,7 +47,13 @@ public final class ProcurementBuilder {
     return this;
   }
 
+  public ProcurementBuilder closingAt(Instant proposalClosesAt) {
+    this.proposalClosesAt = proposalClosesAt;
+    return this;
+  }
+
   public Procurement build() {
-    return new Procurement(controlNumber, objectDescription, state, estimatedValue);
+    return new Procurement(
+        controlNumber, objectDescription, state, estimatedValue, proposalClosesAt);
   }
 }

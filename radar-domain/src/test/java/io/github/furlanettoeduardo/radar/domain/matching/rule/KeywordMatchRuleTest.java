@@ -140,7 +140,7 @@ class KeywordMatchRuleTest {
   }
 
   private static ScoringSubject describing(String objectDescription) {
-    return new ScoringSubject(aProcurement().describing(objectDescription).build());
+    return ScoringSubject.unenriched(aProcurement().describing(objectDescription).build());
   }
 
   private static SearchProfile withKeywords(String... keywords) {
