@@ -4,16 +4,15 @@ import java.time.Duration;
 import java.util.Objects;
 
 /**
- * How much time a supplier needs, expressed as data so it can be tuned without touching rule
- * logic.
+ * How much time a supplier needs, expressed as data so it can be tuned without touching rule logic.
  *
  * <p>Beyond {@code comfortable} there is enough runway to assemble documents without hurrying, and
  * more time buys nothing further. At or inside {@code viable} the notice is barely actionable and
  * scores the floor. Between the two, strength falls linearly.
  *
  * <p>The floor sits above zero on purpose. A notice closing tomorrow is still winnable by a
- * supplier whose paperwork is ready; scoring it zero would be a soft disqualification, and the
- * rule already has a hard one for deadlines that have actually passed.
+ * supplier whose paperwork is ready; scoring it zero would be a soft disqualification, and the rule
+ * already has a hard one for deadlines that have actually passed.
  */
 public record DeadlineHorizon(Duration comfortable, Duration viable, double floorStrength) {
 

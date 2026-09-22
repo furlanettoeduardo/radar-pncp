@@ -1,6 +1,7 @@
 package io.github.furlanettoeduardo.radar.domain;
 
 import io.github.furlanettoeduardo.radar.domain.common.BrazilianState;
+import io.github.furlanettoeduardo.radar.domain.common.Score;
 import io.github.furlanettoeduardo.radar.domain.company.Cnae;
 import io.github.furlanettoeduardo.radar.domain.company.CompanyId;
 import io.github.furlanettoeduardo.radar.domain.profile.SearchProfile;
@@ -18,6 +19,7 @@ public final class SearchProfileBuilder {
   private List<Cnae> cnaes = List.of();
   private Set<BrazilianState> states = Set.of();
   private Optional<ValueRange> valueRange = Optional.empty();
+  private Score minimumScore = Score.of(50);
 
   private SearchProfileBuilder() {}
 
@@ -45,6 +47,11 @@ public final class SearchProfileBuilder {
     return this;
   }
 
+  public SearchProfileBuilder scoringAtLeast(int minimumScore) {
+    this.minimumScore = Score.of(minimumScore);
+    return this;
+  }
+
   public SearchProfile build() {
     return new SearchProfile(
         new SearchProfileId(UUID.randomUUID()),
@@ -52,6 +59,7 @@ public final class SearchProfileBuilder {
         keywords,
         cnaes,
         states,
-        valueRange);
+        valueRange,
+        minimumScore);
   }
 }

@@ -1,6 +1,7 @@
 package io.github.furlanettoeduardo.radar.domain.matching.rule;
 
 import io.github.furlanettoeduardo.radar.domain.common.MonetaryValue;
+import io.github.furlanettoeduardo.radar.domain.matching.RuleId;
 import io.github.furlanettoeduardo.radar.domain.matching.RuleOutcome;
 import io.github.furlanettoeduardo.radar.domain.matching.ScoringSubject;
 import io.github.furlanettoeduardo.radar.domain.profile.SearchProfile;
@@ -17,6 +18,11 @@ import java.util.Optional;
  * could not be evaluated, and the difference is visible in the match's evidence coverage.
  */
 public final class EstimatedValueRule implements ScoringRule {
+
+  @Override
+  public RuleId id() {
+    return RuleId.ESTIMATED_VALUE;
+  }
 
   @Override
   public RuleOutcome evaluate(ScoringSubject subject, SearchProfile profile, Instant evaluatedAt) {

@@ -1,6 +1,7 @@
 package io.github.furlanettoeduardo.radar.domain.matching.rule;
 
 import io.github.furlanettoeduardo.radar.domain.common.BrazilianState;
+import io.github.furlanettoeduardo.radar.domain.matching.RuleId;
 import io.github.furlanettoeduardo.radar.domain.matching.RuleOutcome;
 import io.github.furlanettoeduardo.radar.domain.matching.ScoringSubject;
 import io.github.furlanettoeduardo.radar.domain.profile.SearchProfile;
@@ -18,6 +19,11 @@ import java.util.Set;
  * itself not applicable rather than silently awarding or withholding its weight.
  */
 public final class StateMatchRule implements ScoringRule {
+
+  @Override
+  public RuleId id() {
+    return RuleId.STATE;
+  }
 
   @Override
   public RuleOutcome evaluate(ScoringSubject subject, SearchProfile profile, Instant evaluatedAt) {

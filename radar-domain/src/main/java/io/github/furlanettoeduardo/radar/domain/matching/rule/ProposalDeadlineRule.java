@@ -1,5 +1,6 @@
 package io.github.furlanettoeduardo.radar.domain.matching.rule;
 
+import io.github.furlanettoeduardo.radar.domain.matching.RuleId;
 import io.github.furlanettoeduardo.radar.domain.matching.RuleOutcome;
 import io.github.furlanettoeduardo.radar.domain.matching.ScoringSubject;
 import io.github.furlanettoeduardo.radar.domain.profile.SearchProfile;
@@ -11,10 +12,10 @@ import java.util.Objects;
  * The only disqualifying rule. A procurement whose proposal window has closed is not a weak match,
  * it is not a match: no score is computed and no amount of weight can bring it back.
  *
- * <p>While the window is open the rule still ranks, because time is a real constraint rather than
- * a yes or no. A notice closing in 36 hours is not actionable for a small supplier assembling
- * certificates, and scoring it identically to one closing in three weeks would rank nothing at
- * all. The curve comes from {@link DeadlineHorizon}.
+ * <p>While the window is open the rule still ranks, because time is a real constraint rather than a
+ * yes or no. A notice closing in 36 hours is not actionable for a small supplier assembling
+ * certificates, and scoring it identically to one closing in three weeks would rank nothing at all.
+ * The curve comes from {@link DeadlineHorizon}.
  *
  * <p>Deadlines are compared as instants. PNCP publishes naive local timestamps and the conversion
  * to an instant happens at the adapter boundary, pinned to America/Sao_Paulo. Because this rule
@@ -27,6 +28,11 @@ public final class ProposalDeadlineRule implements ScoringRule {
 
   public ProposalDeadlineRule(DeadlineHorizon horizon) {
     this.horizon = Objects.requireNonNull(horizon, "a deadline rule needs a horizon");
+  }
+
+  @Override
+  public RuleId id() {
+    return RuleId.PROPOSAL_DEADLINE;
   }
 
   @Override

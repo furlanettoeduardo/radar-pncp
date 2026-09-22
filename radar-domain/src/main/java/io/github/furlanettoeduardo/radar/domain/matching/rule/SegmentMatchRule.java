@@ -4,6 +4,7 @@ import io.github.furlanettoeduardo.radar.domain.company.Cnae;
 import io.github.furlanettoeduardo.radar.domain.enrichment.CnaeSegmentMap;
 import io.github.furlanettoeduardo.radar.domain.enrichment.Enrichment;
 import io.github.furlanettoeduardo.radar.domain.enrichment.ProcurementSegment;
+import io.github.furlanettoeduardo.radar.domain.matching.RuleId;
 import io.github.furlanettoeduardo.radar.domain.matching.RuleOutcome;
 import io.github.furlanettoeduardo.radar.domain.matching.ScoringSubject;
 import io.github.furlanettoeduardo.radar.domain.profile.SearchProfile;
@@ -28,6 +29,11 @@ import java.util.stream.Collectors;
  * criterion was not evaluated, the procurement did not fail it.
  */
 public final class SegmentMatchRule implements ScoringRule {
+
+  @Override
+  public RuleId id() {
+    return RuleId.SEGMENT;
+  }
 
   @Override
   public RuleOutcome evaluate(ScoringSubject subject, SearchProfile profile, Instant evaluatedAt) {

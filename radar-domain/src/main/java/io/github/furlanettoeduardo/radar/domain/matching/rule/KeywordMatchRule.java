@@ -1,5 +1,6 @@
 package io.github.furlanettoeduardo.radar.domain.matching.rule;
 
+import io.github.furlanettoeduardo.radar.domain.matching.RuleId;
 import io.github.furlanettoeduardo.radar.domain.matching.RuleOutcome;
 import io.github.furlanettoeduardo.radar.domain.matching.ScoringSubject;
 import io.github.furlanettoeduardo.radar.domain.profile.SearchProfile;
@@ -14,8 +15,8 @@ import java.util.stream.Collectors;
  * Scores how much of what the profile is looking for actually appears in the object of the
  * procurement.
  *
- * <p>Strength is the fraction of the profile's keywords that were found, not a yes or no: a
- * profile listing four keywords and hitting one is a weaker signal than one hitting all four, and
+ * <p>Strength is the fraction of the profile's keywords that were found, not a yes or no: a profile
+ * listing four keywords and hitting one is a weaker signal than one hitting all four, and
  * collapsing that into a boolean throws the difference away.
  *
  * <p>Comparison folds three things, because a supplier should not have to guess how a buyer typed
@@ -23,20 +24,19 @@ import java.util.stream.Collectors;
  *
  * <ul>
  *   <li>case, so {@code AQUISIÇÃO} and {@code aquisição} are the same word;
- *   <li>accents, so a supplier typing {@code aquisicao} means the {@code AQUISIÇÃO} PNCP
- *       published;
+ *   <li>accents, so a supplier typing {@code aquisicao} means the {@code AQUISIÇÃO} PNCP published;
  *   <li>regular plurals, in both directions, so {@code computador} finds {@code computadores} and
  *       {@code brinquedos} finds {@code brinquedo}.
  * </ul>
  *
- * <p>Matching stays anchored on whole words. Plural folding widens what counts as the same word,
- * it does not turn the rule into a prefix match: {@code cabo} still does not hit inside {@code
+ * <p>Matching stays anchored on whole words. Plural folding widens what counts as the same word, it
+ * does not turn the rule into a prefix match: {@code cabo} still does not hit inside {@code
  * cabocla}.
  *
  * <p>The known gap is irregular plurals. Portuguese forms like {@code material} to {@code
  * materiais}, or {@code ão} to {@code ões}, are not folded, and a test records that rather than
- * leaving it to be discovered. Closing it properly means a stemmer, which is a larger decision
- * than this rule should make on its own.
+ * leaving it to be discovered. Closing it properly means a stemmer, which is a larger decision than
+ * this rule should make on its own.
  */
 public final class KeywordMatchRule implements ScoringRule {
 
@@ -45,6 +45,11 @@ public final class KeywordMatchRule implements ScoringRule {
 
   /** Matches nothing, for a keyword that folds away to nothing at all. */
   private static final Pattern NEVER = Pattern.compile("(?!)");
+
+  @Override
+  public RuleId id() {
+    return RuleId.KEYWORD;
+  }
 
   @Override
   public RuleOutcome evaluate(ScoringSubject subject, SearchProfile profile, Instant evaluatedAt) {

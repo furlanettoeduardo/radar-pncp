@@ -1,6 +1,7 @@
 package io.github.furlanettoeduardo.radar.domain.profile;
 
 import io.github.furlanettoeduardo.radar.domain.common.BrazilianState;
+import io.github.furlanettoeduardo.radar.domain.common.Score;
 import io.github.furlanettoeduardo.radar.domain.company.Cnae;
 import io.github.furlanettoeduardo.radar.domain.company.CompanyId;
 import java.util.List;
@@ -18,7 +19,8 @@ public record SearchProfile(
     List<String> keywords,
     List<Cnae> cnaes,
     Set<BrazilianState> states,
-    Optional<ValueRange> valueRange) {
+    Optional<ValueRange> valueRange,
+    Score minimumScore) {
 
   public SearchProfile {
     Objects.requireNonNull(id, "a search profile must have an id");
@@ -36,5 +38,6 @@ public record SearchProfile(
     Objects.requireNonNull(states, "states must not be null, use an empty set instead");
     states = Set.copyOf(states);
     Objects.requireNonNull(valueRange, "value range must not be null, use Optional.empty()");
+    Objects.requireNonNull(minimumScore, "a search profile must have a minimum score");
   }
 }
