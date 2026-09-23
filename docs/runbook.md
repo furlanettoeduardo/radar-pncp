@@ -124,7 +124,8 @@ A redrive policy counts receives and cannot see why a receive failed. With three
 30 second visibility timeout, **any database outage longer than about ninety seconds dead-letters
 every message in flight** — and an RDS single-AZ maintenance reboot is minutes.
 
-The consumer therefore distinguishes the two. A transient failure extends the message's visibility
+The consumer therefore distinguishes the two; the decision and its alternatives are recorded in
+[ADR 0012](adr/0012-transient-failures-extend-visibility.md). A transient failure extends the message's visibility
 instead of letting it come straight back: 30s, then 2 minutes, then 8 minutes, so the same three
 receives span about ten and a half minutes. Extending visibility does not consume a receive.
 
