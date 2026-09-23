@@ -14,6 +14,19 @@ spring:
       enabled: true
   main:
     banner-mode: off
+  datasource:
+    url: ${RADAR_DB_URL:jdbc:postgresql://localhost:5432/radar}
+    username: ${RADAR_DB_USERNAME:radar}
+    password: ${RADAR_DB_PASSWORD:radar}
+    hikari:
+      # 5 here plus 5 in radar-api, which is the split radar-api's own comment already assumed.
+      maximum-pool-size: 5
+      minimum-idle: 1
+  flyway:
+    # radar-api owns the schema and is the only process that migrates. Two services racing to
+    # apply the same migrations on startup is a deadlock waiting for an unlucky restart order,
+    # and a second owner of the schema is a second opinion about what it should be.
+    enabled: false
 
 radar:
   queues:

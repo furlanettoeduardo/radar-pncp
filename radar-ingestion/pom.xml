@@ -40,6 +40,23 @@
       <artifactId>radar-shared</artifactId>
     </dependency>
 
+    <!--
+      The SQS consumer writes procurements, so this module needs a database. JdbcClient rather
+      than JPA: the repository port is three statements, two of which are conditional writes whose
+      whole point is to be exactly the SQL that was written. An ORM would add a persistence
+      context, a dirty-checking flush and a second mapping of the domain record, none of which
+      this module has a use for, on a box with 256 MB of heap to spend.
+    -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
@@ -85,6 +102,43 @@
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-testcontainers</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!--
+      Test scope only. radar-api owns the migrations and is the only process that applies them at
+      startup; this module's integration tests apply the very same files so that the adapter is
+      tested against the schema that will actually exist, and fail if the two drift apart.
+    -->
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!--
+      The domain's test fixtures: ProcurementRepositoryContract and the test builders. Test scope,
+      so nothing of this reaches the runtime classpath. Without it the JDBC adapter would be held
+      to a copy of the contract rather than to the contract.
+    -->
+    <dependency>
+      <groupId>io.github.furlanettoeduardo</groupId>
+      <artifactId>radar-domain</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
       <scope>test</scope>
     </dependency>
   </dependencies>

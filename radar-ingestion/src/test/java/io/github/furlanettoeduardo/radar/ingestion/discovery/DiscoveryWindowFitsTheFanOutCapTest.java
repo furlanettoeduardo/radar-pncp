@@ -6,7 +6,9 @@ import io.github.furlanettoeduardo.radar.ingestion.pncp.PncpProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Configuration;
 
 /**
  * Guards a configuration deadlock: a lookback window wide enough to need more pages than the fan
@@ -23,8 +25,22 @@ import org.springframework.boot.test.context.SpringBootTest;
  * scope is a real limit and it is recorded as one, in ADR 0010 and in {@link
  * ObservedPageVolumeTest}, rather than here.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@SpringBootTest(
+    classes = DiscoveryWindowFitsTheFanOutCapTest.BindTheRealConfiguration.class,
+    webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class DiscoveryWindowFitsTheFanOutCapTest {
+
+  /**
+   * Binds the real {@code application.yml} without starting the application.
+   *
+   * <p>The full context would drag in a datasource and a queue client, so a question about
+   * arithmetic would fail for want of a database. Binding the two properties records keeps this
+   * test about what it is about, while still reading the same file the application reads, which is
+   * the part that must not drift.
+   */
+  @Configuration
+  @EnableConfigurationProperties({DiscoveryProperties.class, PncpProperties.class})
+  static class BindTheRealConfiguration {}
 
   /**
    * Why 1.5 and not 1.0: the volume figures are a single week of observation against an API whose

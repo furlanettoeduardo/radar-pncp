@@ -11,9 +11,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.messaging.Message;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -33,6 +35,11 @@ import software.amazon.awssdk.services.sqs.model.CreateQueueRequest;
 class SqsProcurementPublisherIT {
 
   private static final String QUEUE = "radar-procurement-discovered";
+
+  // This service needs a database to start at all, since its SQS consumer writes procurements.
+  // Nothing here touches it; it is here so the context can come up the way production does.
+  @Container @ServiceConnection
+  static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
 
   @Container
   static final LocalStackContainer LOCALSTACK =

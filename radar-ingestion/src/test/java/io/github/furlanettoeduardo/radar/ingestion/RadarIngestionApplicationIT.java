@@ -7,16 +7,34 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** Smoke test: the ingestion context starts and exposes the two management endpoints we allow. */
+/**
+ * Smoke test: the ingestion context starts and exposes the two management endpoints we allow.
+ *
+ * <p>An integration test rather than a unit test since this service gained a repository. It needs a
+ * real database to start at all, and the health endpoint it asserts on is only meaningful when
+ * there is one to report on. A version of this that started the context without a database would be
+ * proving that a configuration which cannot run in production can be made to start in a test.
+ *
+ * <p>Flyway is off here exactly as it is in production, so the schema is applied the way this
+ * module will always meet it: created by somebody else, beforehand.
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class RadarIngestionApplicationTest {
+@Testcontainers
+class RadarIngestionApplicationIT {
+
+  @Container @ServiceConnection
+  static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
 
   private final TestRestTemplate restTemplate;
 
-  RadarIngestionApplicationTest(@Autowired TestRestTemplate restTemplate) {
+  RadarIngestionApplicationIT(@Autowired TestRestTemplate restTemplate) {
     this.restTemplate = restTemplate;
   }
 
