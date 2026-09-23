@@ -25,7 +25,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * <p>Flyway is off here exactly as it is in production, so the schema is applied the way this
  * module will always meet it: created by somebody else, beforehand.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    // No queue here, so no consumer: this test is about the context starting and the
+    // management endpoints answering, not about SQS.
+    properties = "radar.consumer.enabled=false")
 @Testcontainers
 class RadarIngestionApplicationIT {
 

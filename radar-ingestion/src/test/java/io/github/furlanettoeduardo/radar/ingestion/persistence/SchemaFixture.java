@@ -15,11 +15,11 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * is the only process that migrates at startup; if its DDL and this module's SQL ever disagree,
  * this build fails instead of the consumer failing at three in the morning.
  */
-final class SchemaFixture {
+public final class SchemaFixture {
 
   private SchemaFixture() {}
 
-  static DataSource migrated(PostgreSQLContainer<?> postgres) {
+  public static DataSource migrated(PostgreSQLContainer<?> postgres) {
     DriverManagerDataSource source = new DriverManagerDataSource();
     source.setUrl(postgres.getJdbcUrl());
     source.setUsername(postgres.getUsername());

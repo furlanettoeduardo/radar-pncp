@@ -55,6 +55,8 @@ class SqsProcurementPublisherIT {
         "spring.cloud.aws.sqs.endpoint",
         () -> LOCALSTACK.getEndpointOverride(LocalStackContainer.Service.SQS).toString());
     registry.add("radar.queues.procurement-discovered", () -> QUEUE);
+    // This test reads the queue itself; a live listener would race it for the messages.
+    registry.add("radar.consumer.enabled", () -> "false");
   }
 
   private final ProcurementPublisher publisher;

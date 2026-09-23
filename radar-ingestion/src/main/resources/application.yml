@@ -31,6 +31,24 @@ spring:
 radar:
   queues:
     procurement-discovered: ${RADAR_PROCUREMENT_QUEUE:radar-procurement-discovered}
+  consumer:
+    # On by default. A switch rather than a constant because the two halves of this service can be
+    # deployed apart: a producer-only instance needs no queue to listen on, and a consumer-only one
+    # is how a backlog gets drained without also discovering more work. Tests that want neither
+    # turn it off rather than arranging a queue they have no use for.
+    enabled: ${RADAR_CONSUMER_ENABLED:true}
+    # SQS queue attributes, owned by stage 8's Terraform and mirrored here because the consumer has
+    # to agree with them. The integration tests create their queue from these values.
+    #
+    # 30s: the work behind one message is a single database round trip, measured in milliseconds,
+    # so this is about a hundred times the expected handling time. It is also the base of the
+    # transient-failure backoff, which is why it is not simply "as small as possible".
+    visibility-timeout: 30s
+    # 3 receives, then the redrive policy moves the message to the dead letter queue. Kept low on
+    # purpose: a genuinely poisoned message should stop being retried quickly and become visible.
+    # A database outage no longer burns these, because a transient failure extends the message's
+    # visibility rather than failing immediately. See ADR 0012.
+    max-receive-count: 3
   discovery:
     # Overlaps the schedule deliberately rather than matching it. A run that looks back exactly as
     # far as the interval loses everything published during an outage. The overlap is free on the
