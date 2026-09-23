@@ -67,13 +67,17 @@ public final class PncpProcurementSource implements ProcurementSource, Procureme
    */
   @Override
   public List<FetchedProcurement> fetch(ProcurementQuery query) {
+    // One budget for the whole fetch, opened here and spent across both phases. Opening it inside
+    // each phase would bound a run at twice the configured deadline rather than at it.
+    StructuredFanOut.Budget budget = fanOut.startBudget();
+
     List<PncpPageRequest> firstPages = firstPageOfEachCombination(query);
     requireWithinCap(firstPages.size(), query);
-    List<PncpPage> opening = fanOut.runAll(firstPages, pageClient::fetch);
+    List<PncpPage> opening = fanOut.runAll(firstPages, pageClient::fetch, budget);
 
     List<PncpPageRequest> remaining = remainingPages(firstPages, opening);
     requireWithinCap(firstPages.size() + remaining.size(), query);
-    List<PncpPage> rest = fanOut.runAll(remaining, pageClient::fetch);
+    List<PncpPage> rest = fanOut.runAll(remaining, pageClient::fetch, budget);
 
     List<FetchedProcurement> fetched = new ArrayList<>();
     opening.forEach(page -> map(page, fetched));

@@ -158,7 +158,7 @@ class StructuredFanOutTest {
                           }
                         }))
         .isInstanceOf(FanOutTimedOutException.class)
-        .hasMessageContaining("did not finish within")
+        .hasMessageContaining("ran out of the operation budget")
         .hasMessageContaining("40 jobs");
 
     // Same shape as the cancellation proof: nothing is still running when the failure surfaces.
