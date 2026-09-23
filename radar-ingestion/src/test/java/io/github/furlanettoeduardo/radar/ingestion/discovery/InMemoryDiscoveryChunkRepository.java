@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * A fake chunk store, held to {@link DiscoveryChunkRepositoryContract} beside the JDBC adapter.
@@ -96,9 +97,10 @@ final class InMemoryDiscoveryChunkRepository implements DiscoveryChunkRepository
   }
 
   @Override
-  public List<CoverageGap> detectGaps(LocalDate windowStart, Instant now) {
+  public List<CoverageGap> detectGaps(
+      LocalDate windowStart, List<Integer> modalityCodes, Set<BrazilianState> states, Instant now) {
     List<CoverageGap> found = new ArrayList<>();
-    responsibilities()
+    responsibilities(modalityCodes, states)
         .forEach(
             (pair, since) -> {
               for (LocalDate date = since; date.isBefore(windowStart); date = date.plusDays(1)) {
@@ -120,11 +122,16 @@ final class InMemoryDiscoveryChunkRepository implements DiscoveryChunkRepository
    * The first publication date each modality and state was ever scheduled for. Scheduled only: a
    * manual backfill of an old date must not make us answerable for everything since.
    */
-  private Map<Pair, LocalDate> responsibilities() {
+  private Map<Pair, LocalDate> responsibilities(
+      List<Integer> modalityCodes, Set<BrazilianState> states) {
     Map<Pair, LocalDate> since = new LinkedHashMap<>();
     rows.forEach(
         (key, row) -> {
           if (row.origin != ChunkOrigin.SCHEDULED) {
+            return;
+          }
+          if (!modalityCodes.contains(key.modalityCode()) || !states.contains(key.state())) {
+            // Not collected any more. Its history stays, and it stops accruing new losses.
             return;
           }
           Pair pair = new Pair(key.modalityCode(), key.state());

@@ -12,8 +12,12 @@ import io.github.furlanettoeduardo.radar.ingestion.pncp.SampleFixtures;
 import io.github.furlanettoeduardo.radar.shared.ProcurementDiscovered;
 import java.sql.Connection;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,11 +51,17 @@ import software.amazon.awssdk.services.sqs.model.QueueAttributeName;
  * in flight. Redrive would recover them, because the consumer is idempotent, but a routine
  * maintenance window should not need an operator at all.
  *
- * <p><b>The outage here is longer than three visibility timeouts on purpose.</b> With a base of 2s,
- * an unmodified consumer would take its three receives at roughly 0s, 2s and 4s and dead-letter the
- * message by 6s. The backoff spreads the same three receives across 2s, 8s and 32s, so the third
- * one lands after the outage has passed. A test whose outage ended before the third receive would
- * pass either way and prove nothing.
+ * <p><b>The outage ends on an event, not on a clock.</b> It is lifted the moment the second receive
+ * has been spent on it, which always happens before the third. An earlier version slept for nine
+ * seconds and left about a second of margin before the third receive — the shape of flake this
+ * project has already chased once, and one that only appears on a loaded runner.
+ *
+ * <p>What is asserted instead is the property that matters: two of the three receives were consumed
+ * by the outage, the third stored the message, and the whole thing took longer than three plain
+ * visibility timeouts. With a base of 2s an unmodified consumer would have taken its three receives
+ * by 6s and dead-lettered the message; the backoff spreads them across 2s, 8s and 32s. A slow
+ * runner makes that elapsed figure larger, never smaller, so it cannot flake in the direction of
+ * passing wrongly.
  *
  * <p>What is real here and what is not: SQS is real (LocalStack), the redrive policy is real, the
  * queue attributes are the configured ones, and PostgreSQL is real. The outage itself is injected
@@ -72,6 +82,12 @@ class DatabaseOutageDoesNotPoisonMessagesIT {
   private static final Duration BASE_VISIBILITY = Duration.ofSeconds(2);
 
   private static final AtomicBoolean DATABASE_IS_DOWN = new AtomicBoolean();
+  private static final AtomicInteger REFUSALS = new AtomicInteger();
+
+  /**
+   * Counts down on the second refusal, which is the event the test waits for rather than a clock.
+   */
+  private static final CountDownLatch TWO_RECEIVES_SPENT = new CountDownLatch(2);
 
   @Container
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
@@ -151,24 +167,40 @@ class DatabaseOutageDoesNotPoisonMessagesIT {
   }
 
   @Test
-  @DisplayName("a message survives an outage longer than three visibility timeouts")
-  void aMessageSurvivesAnOutageLongerThanThreeVisibilityTimeouts() throws Exception {
+  @DisplayName("a message survives an outage that spends two of its three receives")
+  void aMessageSurvivesAnOutageThatSpendsTwoOfItsThreeReceives() throws Exception {
+    Instant publishedAt = Instant.now();
     DATABASE_IS_DOWN.set(true);
     publisher.publish(aDiscoveredProcurement());
 
-    // Longer than 3 x 2s, which is where an unmodified consumer would have dead-lettered it.
-    Thread.sleep(Duration.ofSeconds(9).toMillis());
+    // Event driven, not timed. The outage ends when the second receive has been spent on it, which
+    // is guaranteed to happen before the third one; nothing here races a clock in either direction,
+    // so a slow runner can only make the assertions below stronger.
+    assertThat(TWO_RECEIVES_SPENT.await(2, TimeUnit.MINUTES))
+        .as("two receives must be spent on the outage, or the backoff is never exercised")
+        .isTrue();
     DATABASE_IS_DOWN.set(false);
 
     await()
-        .atMost(Duration.ofSeconds(60))
+        .atMost(Duration.ofMinutes(2))
         .pollInterval(Duration.ofSeconds(1))
         .untilAsserted(
             () ->
                 assertThat(procurements.findByControlNumber(new PncpControlNumber(CONTROL_NUMBER)))
-                    .as("the message waited out the outage and was stored on a later receive")
+                    .as("the third receive found the database back and stored it")
                     .isPresent());
 
+    assertThat(Duration.between(publishedAt, Instant.now()))
+        .as(
+            "the three receives were spread beyond %s, which is where an unmodified consumer would"
+                + " already have dead-lettered this message",
+            BASE_VISIBILITY.multipliedBy(3))
+        .isGreaterThan(BASE_VISIBILITY.multipliedBy(3));
+    assertThat(REFUSALS.get())
+        .as(
+            "exactly two receives were refused: one more and the redrive policy would have taken"
+                + " it")
+        .isEqualTo(2);
     assertThat(messagesIn(DEAD_LETTER_QUEUE))
         .as("nothing was wrong with this message, so nothing should have dead-lettered it")
         .isZero();
@@ -233,6 +265,8 @@ class DatabaseOutageDoesNotPoisonMessagesIT {
 
         private void refuseIfDown() {
           if (DATABASE_IS_DOWN.get()) {
+            REFUSALS.incrementAndGet();
+            TWO_RECEIVES_SPENT.countDown();
             throw new CannotGetJdbcConnectionException("connection refused: the database is down");
           }
         }

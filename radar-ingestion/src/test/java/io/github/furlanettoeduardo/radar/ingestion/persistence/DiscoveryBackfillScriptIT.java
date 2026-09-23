@@ -103,7 +103,13 @@ class DiscoveryBackfillScriptIT {
   void aBackfilledChunkIsNeverAGap() {
     runBackfillFor(LocalDate.of(2020, 1, 1), 6, BrazilianState.SP);
 
-    assertThat(repository().detectGaps(LocalDate.of(2026, 9, 21), java.time.Instant.now()))
+    assertThat(
+            repository()
+                .detectGaps(
+                    LocalDate.of(2026, 9, 21),
+                    java.util.List.of(6),
+                    java.util.Set.of(BrazilianState.SP),
+                    java.time.Instant.now()))
         .as("one backfill of an old date must not report every date since as lost")
         .isEmpty();
   }

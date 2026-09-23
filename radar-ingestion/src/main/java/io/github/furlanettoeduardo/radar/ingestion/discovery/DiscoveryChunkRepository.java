@@ -4,6 +4,7 @@ import io.github.furlanettoeduardo.radar.domain.common.BrazilianState;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Where chunk outcomes are kept.
@@ -53,8 +54,15 @@ public interface DiscoveryChunkRepository {
    * exist. A service that was down for a week never planned those dates at all, so a check that
    * only looked at existing rows would report nothing and lose the days in silence — which is the
    * failure the lookback is there to survive.
+   *
+   * <p>It is checked only for the scope currently configured. Deriving the modalities and states
+   * from the table instead would mean that dropping a modality reports a fresh loss for it every
+   * day forever — for a modality nobody collects any more, recoverable only by backfilling
+   * something we deliberately stopped wanting. Gaps already recorded stay visible: removing a
+   * modality is not a way to erase what it lost while it was configured.
    */
-  List<CoverageGap> detectGaps(LocalDate windowStart, Instant now);
+  List<CoverageGap> detectGaps(
+      LocalDate windowStart, List<Integer> modalityCodes, Set<BrazilianState> states, Instant now);
 
   void resolveGap(LocalDate publicationDate, int modalityCode, BrazilianState state, Instant now);
 

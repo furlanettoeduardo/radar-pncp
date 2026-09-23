@@ -13,6 +13,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
@@ -121,7 +122,8 @@ public final class JdbcDiscoveryChunkRepository implements DiscoveryChunkReposit
   }
 
   @Override
-  public List<CoverageGap> detectGaps(LocalDate windowStart, Instant now) {
+  public List<CoverageGap> detectGaps(
+      LocalDate windowStart, List<Integer> modalityCodes, Set<BrazilianState> states, Instant now) {
     // The series is generated from the calendar rather than read from the rows. A service that was
     // down for a week never planned those dates, so a check that only looked at existing rows
     // would report nothing and lose the days in silence -- which is the failure the lookback
@@ -136,6 +138,8 @@ public final class JdbcDiscoveryChunkRepository implements DiscoveryChunkReposit
               SELECT modality_code, state, min(publication_date) AS since
               FROM discovery_chunk
               WHERE origin = 'SCHEDULED'
+                AND modality_code IN (:modalityCodes)
+                AND state IN (:states)
               GROUP BY modality_code, state
             ),
             expected AS (
@@ -160,6 +164,8 @@ public final class JdbcDiscoveryChunkRepository implements DiscoveryChunkReposit
             RETURNING publication_date, modality_code, state
             """)
         .param("windowStart", windowStart)
+        .param("modalityCodes", modalityCodes)
+        .param("states", states.stream().map(Enum::name).toList())
         .param("now", utc(now))
         .query(JdbcDiscoveryChunkRepository::toGap)
         .list();

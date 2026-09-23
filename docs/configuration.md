@@ -173,6 +173,44 @@ defaults need 73 pages of a 500 cap, clearing the 1.5x assertion at 110. The sam
 needs about 440, which passes the cap and fails the margin — which is why national scope is recorded
 in ADR 0010 as a limit requiring a different invocation shape, rather than as a bigger cap.
 
+## Consumer — `radar.consumer.*`
+
+| Setting | Default | Label | Basis |
+| --- | --- | --- | --- |
+| `enabled` | **`true`** | **Load-bearing default** | On unless explicitly switched off. It exists because the two halves of this service can be deployed apart — a producer-only instance needs no queue, a consumer-only one drains a backlog without discovering more work. **Off in production is a silent outage:** everything starts, every health check passes, and the queue fills until retention discards the oldest messages. Guarded twice: `ConsumerIsOnByDefaultTest` asserts the default cannot be flipped unnoticed, and the application logs a WARN at startup when it is off. |
+| `visibility-timeout` | `30s` | **Reasoned** | One database round trip is milliseconds, so this is about 100x the expected handling time. It is also the **base of the transient-failure backoff**, which is why it is not simply as small as possible. |
+| `max-receive-count` | `3` | **Guess, deliberately low** | A poisoned message should stop being retried quickly and become visible. Safe only because a database outage no longer consumes these. |
+
+### What the three receives actually cover
+
+The backoff multiplies the visibility timeout by four on each failed receive:
+
+| Receive | Hidden for | Elapsed since publish |
+| --- | --- | --- |
+| 1 | 30s | 30s |
+| 2 | 2 min | 2 min 30s |
+| 3 | 8 min | **10 min 30s** |
+
+**Total span: 10 minutes 30 seconds**, against **an RDS single-AZ maintenance reboot, which is
+typically one to three minutes** and occasionally longer when the OS is patched. That leaves roughly
+3x margin over a typical reboot.
+
+Without the backoff the same three receives finish in **90 seconds**, which is shorter than the
+thing they are supposed to survive — a message in flight during any ordinary maintenance window
+would be dead-lettered. Extending the visibility does not consume a receive; it only delays the
+next one.
+
+Two consequences worth keeping in mind before changing anything here:
+
+- **`max-receive-count: 3` is not the 90-second budget it looks like.** It is about ten minutes for
+  a transient failure and about ninety seconds for poison, which is the whole point.
+- **`visibility-timeout` scales the entire backoff**, since it is the base. Moving it from 30s to
+  60s makes the span 21 minutes, not 11.
+
+An outage longer than ten and a half minutes still dead-letters, and that is intended: at that point
+an operator should know, and redrive is safe because the consumer is idempotent. See
+[the runbook](runbook.md).
+
 ## Resilience — hardcoded in `PncpPageClient`
 
 | Setting | Value | Label |

@@ -33,6 +33,13 @@ public abstract class DiscoveryChunkRepositoryContract {
     return DiscoveryChunk.scheduled(day(cycleDay), day(publicationDay), modality, SP);
   }
 
+  /** Detection for a configured scope. Every test names the modalities it collects. */
+  private static java.util.List<CoverageGap> detectFor(
+      DiscoveryChunkRepository repository, LocalDate windowStart, Integer... modalities) {
+    return repository.detectGaps(
+        windowStart, java.util.List.of(modalities), java.util.Set.of(SP), NOW);
+  }
+
   private static void planAndComplete(DiscoveryChunkRepository repository, DiscoveryChunk chunk) {
     repository.planIfAbsent(chunk, NOW);
     repository.complete(chunk, NOW, 1, 1);
@@ -137,7 +144,7 @@ public abstract class DiscoveryChunkRepositoryContract {
     DiscoveryChunkRepository repository = repository();
     planAndComplete(repository, chunk(20, 20, 6));
 
-    List<CoverageGap> gaps = repository.detectGaps(day(21), NOW);
+    List<CoverageGap> gaps = detectFor(repository, day(21), 6);
 
     assertThat(gaps)
         .as("everything published on the 20th after that fetch was never collected")
@@ -152,7 +159,7 @@ public abstract class DiscoveryChunkRepositoryContract {
     planAndComplete(repository, chunk(20, 20, 6));
     planAndComplete(repository, chunk(21, 20, 6));
 
-    assertThat(repository.detectGaps(day(21), NOW)).isEmpty();
+    assertThat(detectFor(repository, day(21), 6)).isEmpty();
   }
 
   @Test
@@ -161,8 +168,8 @@ public abstract class DiscoveryChunkRepositoryContract {
     DiscoveryChunkRepository repository = repository();
     planAndComplete(repository, chunk(20, 20, 6));
 
-    assertThat(repository.detectGaps(day(21), NOW)).hasSize(1);
-    assertThat(repository.detectGaps(day(21), NOW))
+    assertThat(detectFor(repository, day(21), 6)).hasSize(1);
+    assertThat(detectFor(repository, day(21), 6))
         .as("an alert that repeats every three hours is an alert nobody reads")
         .isEmpty();
     assertThat(repository.openGaps()).hasSize(1);
@@ -176,7 +183,7 @@ public abstract class DiscoveryChunkRepositoryContract {
     // 15th through the 17th were never planned at all: no rows, and nothing to notice them by.
     planAndComplete(repository, chunk(15, 14, 6));
 
-    List<CoverageGap> gaps = repository.detectGaps(day(18), NOW);
+    List<CoverageGap> gaps = detectFor(repository, day(18), 6);
 
     assertThat(gaps)
         .as(
@@ -194,7 +201,7 @@ public abstract class DiscoveryChunkRepositoryContract {
     // Modality 8 turned up for the first time on the 20th.
     planAndComplete(repository, chunk(20, 19, 8));
 
-    List<CoverageGap> gaps = repository.detectGaps(day(21), NOW);
+    List<CoverageGap> gaps = detectFor(repository, day(21), 6, 8);
 
     assertThat(gaps)
         .filteredOn(gap -> gap.modalityCode() == 8)
@@ -218,7 +225,7 @@ public abstract class DiscoveryChunkRepositoryContract {
     repository.planIfAbsent(ancient, NOW);
     repository.complete(ancient, NOW, 1, 1);
 
-    assertThat(repository.detectGaps(day(20), NOW))
+    assertThat(detectFor(repository, day(20), 6))
         .as("otherwise one backfill of an old date reports every date since as lost")
         .isEmpty();
   }
@@ -228,10 +235,35 @@ public abstract class DiscoveryChunkRepositoryContract {
   void backfillingResolvesTheGap() {
     DiscoveryChunkRepository repository = repository();
     planAndComplete(repository, chunk(20, 20, 6));
-    assertThat(repository.detectGaps(day(21), NOW)).hasSize(1);
+    assertThat(detectFor(repository, day(21), 6)).hasSize(1);
 
     repository.resolveGap(day(20), 6, SP, NOW);
 
     assertThat(repository.openGaps()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a modality nobody collects any more stops accruing gaps, without hiding old ones")
+  void aRemovedModalityStopsProducingNewGaps() {
+    DiscoveryChunkRepository repository = repository();
+    planAndComplete(repository, chunk(15, 14, 6));
+    planAndComplete(repository, chunk(15, 14, 8));
+
+    // While modality 8 was configured, a date it missed is a loss like any other.
+    assertThat(detectFor(repository, day(16), 6, 8))
+        .extracting(CoverageGap::modalityCode)
+        .contains(8);
+
+    // Modality 8 is dropped from the configuration. Its rows stay in the table.
+    List<CoverageGap> afterRemoval = detectFor(repository, day(18), 6);
+
+    assertThat(afterRemoval)
+        .as("a modality we no longer collect must not report a fresh loss every day forever")
+        .extracting(CoverageGap::modalityCode)
+        .containsOnly(6);
+    assertThat(repository.openGaps())
+        .as("what it lost while it was configured stays visible: removal is not a way to hide it")
+        .extracting(CoverageGap::modalityCode)
+        .contains(8);
   }
 }

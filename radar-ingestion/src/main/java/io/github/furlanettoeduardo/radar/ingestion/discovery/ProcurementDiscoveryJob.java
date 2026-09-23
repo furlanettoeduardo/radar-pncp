@@ -97,7 +97,8 @@ public final class ProcurementDiscoveryJob {
    * happen is for it to go quietly.
    */
   private void reportCoverageGaps(DiscoveryCycle cycle, Instant now) {
-    for (CoverageGap gap : chunks.detectGaps(cycle.windowStart(), now)) {
+    for (CoverageGap gap :
+        chunks.detectGaps(cycle.windowStart(), pncp.modalityCodes(), discovery.states(), now)) {
       LOG.error(
           "discovery coverage gap: publicationDate={} modality={} state={} left the {} day window "
               + "with no successful fetch after it closed, and its notices were never collected",

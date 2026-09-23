@@ -387,8 +387,12 @@ class ProcurementDiscoveryJobTest {
     }
 
     @Override
-    public List<CoverageGap> detectGaps(LocalDate windowStart, Instant now) {
-      return delegate.detectGaps(windowStart, now);
+    public List<CoverageGap> detectGaps(
+        LocalDate windowStart,
+        List<Integer> modalityCodes,
+        java.util.Set<BrazilianState> states,
+        Instant now) {
+      return delegate.detectGaps(windowStart, modalityCodes, states, now);
     }
 
     @Override
