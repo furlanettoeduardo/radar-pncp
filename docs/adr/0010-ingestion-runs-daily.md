@@ -91,38 +91,63 @@ Recorded so that a future reader knows what to watch for rather than re-deriving
 - **Volume falling far enough that a day is a handful of pages.** Unlikely, and the opposite is the
   direction to expect.
 
-## The coupling this creates
+## The coupling this created, and why it is gone
 
-Two numbers are now joined and **neither can move alone**: `radar.discovery.lookback-days` and
-`radar.pncp.max-total-pages`.
+**While one run was one fan out**, `radar.discovery.lookback-days` and the page cap could not move
+alone. A wider window meant more pages inside a single capped operation, and a lookback wide enough
+to exceed the cap would have thrown on *every* run and never once succeeded — a configuration
+deadlock a scheduled job would surface at an unhelpful hour.
 
-The lookback overlaps the schedule deliberately, so a missed run does not lose a day permanently.
-That overlap is free on the storage side, because the consumer deduplicates on content hash, and it
-is **not** free on the request side: the redundant day is a full day of pages on every run, 100 to
-160 of them, which is 100 percent overhead on the minimum.
+**Chunking severs it.** The cap is per chunk, and a chunk is one publication date of one modality in
+one state. The width of the window cannot change the size of the largest chunk.
 
-At the defaults — 3 calendar days of SP modality 6, at 24.4 pages a day — a run needs about **73
-pages against a cap of 500**, and the 1.5× safety assertion clears at 110. That is a comfortable
-margin, and it is comfortable *because the scope is one state*. The same configuration nationally
-needs about **440 pages of the 500**, which passes the cap and fails the margin.
+What bounds the lookback now:
 
-**A lookback wide enough to exceed the cap would throw on every run and never once succeed** — a
-configuration deadlock, and one that a scheduled job would surface at an unhelpful hour.
-`DiscoveryWindowFitsTheFanOutCapTest` binds the real configuration and fails the build instead,
-with the arithmetic in the message:
+- **the run budget**, since every chunk of the window is still worked in one invocation;
+- **politeness**, since every extra day is a full day of pages against a public API, every day,
+  forever.
 
-```
-a 4 day lookback over [SP] for modalities [6] needs about 122 pages, against a cap of 500
-```
+Neither is a deadlock. Exceeding them degrades a run rather than making every run impossible, which
+is why `ChunkAndRunFitTheirBudgetsTest` asserts both with a margin rather than exactly:
 
-That test is the thing stopping somebody from raising one number and discovering the other in
-production. It is not documentation of the coupling; it is the enforcement of it.
+| Invariant | At the current configuration |
+| --- | --- |
+| largest chunk at peak, x1.5, under the per-chunk cap | 71 pages x 1.5 = **106 against 500** |
+| a peak run, at 8 at a time and the slowest page ever measured, x1.5, under the deadline | **about 87s against 5 minutes** |
 
-It costs what the **configured** scope costs. An earlier version asserted against a national
-extrapolation while the application was configured for one state, which gated a working
-configuration on a number describing a different system. `ObservedPageVolume` supplies the figures
-and **refuses to estimate**: a state or a modality nobody has measured throws rather than borrowing
-SP's numbers, so widening the scope fails the build instead of being discovered from the bill.
+A third test asserts the decoupling itself, so nobody quietly reintroduces it.
+
+## The lookback is 3, and it is sized for reliability
+
+`lookback-days: 3`, which is **four calendar days** per run because `dataInicial` and `dataFinal`
+are inclusive.
+
+The number follows from what coverage means. A publication date keeps gaining notices all day, so a
+fetch made while the date is still open cannot be the last word on it — modality 6 for
+2026-09-15..21 was 1,697 records when first sampled and 1,707 when measured the next day. **Only a
+cycle that began after a date closed settles it.** So a lookback of N buys N covering cycles, not
+N+1:
+
+| Lookback | Window (calendar days) | Covering cycles for a date | Consecutive lost days survived |
+| --- | --- | --- | --- |
+| 2 | 3 | P+1, P+2 | 1 |
+| **3** | **4** | **P+1, P+2, P+3** | **2** |
+| 4 | 5 | P+1 … P+4 | 3 |
+
+Two survivable bad days rather than one, for about 33% more pages at peak. The likeliest bad day is
+**not PNCP**: it is this project's single t3.micro being down for an OOM or a broken deploy, and
+that is a class of outage that lasts hours rather than minutes.
+
+It is affordable only because chunking decoupled the lookback from the cap. The largest chunk stays
+at 71 pages whatever the window is; only the run grows, and a peak run is about a minute against a
+five minute budget.
+
+**What revisits this number:** the late-arrival distribution, `radar.pncp.notices.late_arrival`,
+which records the age in days of every newly inserted procurement whose publication date is older
+than yesterday, in fixed buckets of 1, 2, 3, 4, 5, 7 and 14 days. When there is a month of it, the
+question "what share of late arrivals would a lookback of N have caught" is a reading rather than
+an argument. Until then this is a judgement about outages, and it says so.
+
 
 ## The design limit: national scope needs a different invocation shape
 
@@ -226,6 +251,74 @@ concern.
 rules, Flyway migrations are owned by `radar-api`, so the DDL for a table written by
 `radar-ingestion` lives in the other module — the same split ShedLock's own table already has, and
 worth stating rather than discovering.
+
+## The chunk is the unit of success
+
+Decided after the reliability numbers, not before. On 2026-09-23, **36 of 42 calls** to
+`contratacoes/publicacao` failed, in two distinct modes: fast 5xx, and zero-byte hangs. An earlier
+sample the same afternoon was 11 of 17. Modality 4's seven-day query failed four times, and a
+day-by-day retry hit **21 consecutive zero-byte hangs at 60s across all seven days** — including
+2026-09-17, which had answered in 0.73s earlier that same day. That rules out a poison day and
+leaves PNCP degradation.
+
+Under all-or-nothing, a run needed **every** page to succeed. Over 235 to 335 pages, with failures
+that are not perfectly clustered, run success falls off exponentially with page count. And it bought
+nothing: the consumer deduplicates on content hash, so a partial publish is safe and a repeated
+chunk is a no-op.
+
+**A chunk is one PNCP query — one publication date, one modality, one state — paginated to
+completion.**
+
+- A chunk publishes when it completes. A failed chunk publishes nothing: the first-failure latch
+  stays, scoped to the chunk.
+- **Success is recorded after publishing, never before.** A crash between the two refetches and
+  republishes, which the consumer absorbs; the reverse order loses notices silently.
+- The three-hourly attempt refetches only the chunks that have not succeeded, not the window.
+- The cap applies per chunk, so the margin problem disappears by construction rather than by
+  raising it.
+
+Under chunks, the pages that succeeded on a bad afternoon would have been kept. Under
+all-or-nothing they were discarded.
+
+### A date that is lost must not be lost quietly
+
+A publication date that leaves the window without a single covering fetch is gone. It gets an ERROR
+line naming the date, and a `radar.pncp.chunks.expired` counter tagged by **modality and state**,
+both bounded — the date goes in the message and in the table, because a metric tag whose values grow
+forever is a slow memory leak on a box with a gigabyte to spend. Stage 8 alerts on the counter.
+
+Detection **generates the calendar** rather than reading the rows that happen to exist. A service
+down for five days never planned those dates at all, so a check over existing rows would report
+nothing and lose the days in silence — which is exactly the failure a lookback of 3 is there to
+survive. Responsibility starts per modality and state at the first date each was scheduled for, so
+configuring a new modality does not flag its entire history, and it counts scheduled rows only, so
+one backfill of an old date does not report every date since as lost.
+
+The backfill procedure is a versioned, parameterised script in the repository
+(`db/operations/backfill-discovery-chunk.sql`), run with **bound** parameters and never typed by
+hand against production; stage 8's runbook runs it through SSM. It records a MANUAL chunk and lets
+the next cycle do the work, so the fetching, publishing and completion ordering exist once rather
+than twice. `DiscoveryBackfillScriptIT` executes that very file against a real schema, so it cannot
+rot.
+
+## Per-page retries stay at 300-900ms
+
+Recorded here because the alternative is tempting and wrong.
+
+`maxAttempts(3)` with `ofExponentialRandomBackoff(200ms, 2.0, 0.5)` gives two waits of 100-300ms and
+200-600ms: **300-900ms of backoff**, and a whole retry series of about **1.5s** against the fast 5xx
+that dominate. PNCP was observed recovering once after two failures 15 seconds apart, and once not
+at all after two minutes. Stretching the retry to cover 30 seconds would catch one of those two and
+neither reliably.
+
+It stays short because:
+
+1. the fan out holds a concurrency permit for the whole series, so eight pages each waiting out 30s
+   turns a fast honest failure into a slow one;
+2. the breaker opens after ten recorded calls, so during a real outage only the first handful of
+   pages get their full budget however generous it is;
+3. **riding out an outage is the schedule's job.** A three-hourly re-attempt covers both the
+   15-second case and the two-minute case, and costs nothing when PNCP is healthy.
 
 ### Consequences
 

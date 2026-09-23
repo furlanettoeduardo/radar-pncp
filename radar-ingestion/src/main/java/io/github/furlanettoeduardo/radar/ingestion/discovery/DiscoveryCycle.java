@@ -2,6 +2,7 @@ package io.github.furlanettoeduardo.radar.ingestion.discovery;
 
 import io.github.furlanettoeduardo.radar.ingestion.pncp.PncpTimestamps;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
@@ -40,8 +41,16 @@ public record DiscoveryCycle(LocalDate date, int lookbackDays) {
 
   public static DiscoveryCycle at(Clock clock, int lookbackDays) {
     Objects.requireNonNull(clock, "a cycle needs a clock");
-    return new DiscoveryCycle(
-        LocalDate.now(clock.withZone(PncpTimestamps.PNCP_ZONE)), lookbackDays);
+    return at(clock.instant(), lookbackDays);
+  }
+
+  /**
+   * The instant form, for a caller that has already read the clock. A run reads it once and works
+   * from that reading, so that the same run cannot disagree with itself about what day it is.
+   */
+  public static DiscoveryCycle at(Instant now, int lookbackDays) {
+    Objects.requireNonNull(now, "a cycle needs an instant");
+    return new DiscoveryCycle(LocalDate.ofInstant(now, PncpTimestamps.PNCP_ZONE), lookbackDays);
   }
 
   /** The oldest publication date this cycle still owes. Anything earlier has left the window. */

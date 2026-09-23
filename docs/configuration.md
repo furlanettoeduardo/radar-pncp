@@ -13,8 +13,8 @@ and [ADR 0008](adr/0008-virtual-threads-and-structured-concurrency-for-page-fetc
 | Setting | Default | Label | Basis |
 | --- | --- | --- | --- |
 | `page-size` | `10` | **Measured, and deliberately not raised** | PNCP also accepts `tamanhoPagina=50`, verified 2026-09-23: modality 8 over the same week came back as 69 pages instead of 344. Kept at 10 because **latency scales with page size** — time to first byte was 3.7s at 50 against 0.35–1.04s at 10 — so 5x fewer requests is roughly the same total server time in fewer, slower calls, and it cuts read-timeout headroom from ~10x to ~2.7x. Revisit with production latency in stage 8. See [ADR 0010](adr/0010-ingestion-runs-daily.md). |
-| `max-total-pages` | `500` | **Measured against the configured scope** | SP modality 6 is 171 pages over the week of 2026-09-15..21, so 24.4 a day; the configured 3-day window costs about **73 pages**, and 500 is roughly 7x that. The figure that is *not* measured is the national multiplier, and nothing that must pass depends on it any more — see the design limit in [ADR 0010](adr/0010-ingestion-runs-daily.md). |
-| `modality-codes` | `[6]` | **Evidenced, and a known limitation** | 6 is the only `codigoModalidadeContratacao` in the original samples, and PNCP rejects the call without one. Modalities 4 and 8 have since been sampled and measured but are **not** configured: adding one is a volume decision, and `ObservedPageVolume` refuses to price a modality nobody has measured. The system deliberately sees a fraction of PNCP's catalogue rather than inventing the rest of the table. |
+| `max-pages-per-chunk` | `500` | **Measured against the largest chunk** | Caps *one* chunk: one publication date, one modality, one state. The largest is a peak day of modality 8 at about **71 pages**, so 500 is roughly 7x it. Renamed from `max-total-pages` when the cap stopped bounding a whole run; the value did not change. It no longer moves with the lookback — see [ADR 0010](adr/0010-ingestion-runs-daily.md). |
+| `modality-codes` | `[4, 6, 8]` | **Two measured, one estimated** | Measured 2026-09-23 on SP over 2026-09-15..21: modality 6 is 24.4 pages a day, modality 8 is 49.1. **Modality 4 is an estimate** bounded at 4 a day from a single Thursday: its seven-day query failed four times, and a day-by-day retry hit 21 consecutive zero-byte hangs. Chunking makes that safe to configure — an underestimate fails one chunk against its cap instead of truncating a run. `ObservedPageVolume` refuses to price a modality nobody has measured at all. |
 | `max-concurrent-requests` | `8` | **Guess** | No PNCP rate-limit documentation was consulted and nothing in the samples speaks to it. 8 is a conventional polite number. |
 | `connect-timeout` | `2s` | **Measured (n=5, 2026-09-23)** | Observed connect took 0.05–0.09s. 2s is over 20x the slowest measurement, which is generous on purpose: a connect that is merely slow should not fail, and a connect that never completes is what this bounds. |
 | `read-timeout` | `10s` | **Measured (n=5, 2026-09-23)** | Time to first byte on the consulta endpoint was 0.35–1.04s at `page-size: 10`. 10s is about 10x the slowest normal response. Separately, two calls hung with zero bytes for over 60s and for about 7 minutes — that is what this value exists to bound, and the reason to keep it low rather than raise it. Raising the page size would eat this headroom; see the row above. |
@@ -33,7 +33,8 @@ Five calls to `contratacoes/publicacao`, at `page-size: 10`:
 Separately, **two calls accepted the connection and sent zero bytes** — once for over 60 seconds, once
 for nearly 7 minutes — and the same query answered in about a second minutes later.
 
-**Of 17 calls made to that endpoint on 2026-09-23, 11 failed:**
+**Of 42 calls made to that endpoint on 2026-09-23, 36 failed**, in two distinct modes: fast 5xx,
+and zero-byte hangs. An earlier sample of 17 that afternoon had 11 failures and broke down as:
 
 | Failure | Count |
 | --- | --- |
@@ -45,6 +46,14 @@ for nearly 7 minutes — and the same query answered in about a second minutes l
 
 One 504 took **70 seconds** to arrive, which puts PNCP's own gateway give-up at about a minute — so
 a client read timeout above 60s would be waiting for a gateway that has already stopped waiting.
+
+Modality 4's seven-day query failed four times, and a day-by-day retry hit **21 consecutive
+zero-byte hangs at 60s across all seven days** — including 2026-09-17, which had answered in 0.73s
+earlier the same day. That rules out a poison day and leaves PNCP degradation.
+
+**This is the measurement that decided the chunk design.** Under all-or-nothing a run needed every
+one of 235 to 335 pages to succeed; at this failure rate, and with failures that are not perfectly
+clustered, that succeeds exponentially rarely. Under chunks the pages that did succeed are kept.
 
 Recovery was inconsistent: one retry series **recovered after two failures 15 seconds apart**, and
 another **had not recovered after about two minutes**. One afternoon is not a baseline. What it is
@@ -85,8 +94,8 @@ and must not treat a failed run as an empty day.
 
 | Setting | Default | Label | Basis |
 | --- | --- | --- | --- |
-| `lookback-days` | `2` | **Guess, with a measured cost** | The value is a judgement about how much outage to survive. What it costs is measured, below. Coupled to `max-total-pages`; see [ADR 0010](adr/0010-ingestion-runs-daily.md). |
-| `states` | `[SP]` | **Product decision, and load-bearing** | SP is the scope this project serves. It was `[]`, meaning every state, which PNCP accepts as an omitted `uf` — and at the measured volumes a national run needs about 440 pages of a 500 cap with no margin left. The configured scope is now what the fan-out margin test prices, so this value is not cosmetic. |
+| `lookback-days` | `3` | **Judgement, with measured cost and a plan to replace it** | Four calendar days per run, since the bounds are inclusive. A date is covered only by a cycle that ran *after* it closed, so a lookback of N buys N covering cycles: 3 survives **two** consecutive lost days. Sized against this project's single instance being down, not against PNCP. No longer coupled to the cap. The `late_arrival` distribution replaces this judgement with a reading; see [ADR 0010](adr/0010-ingestion-runs-daily.md). |
+| `states` | `[SP]` | **Product decision, and load-bearing** | SP is the scope this project serves. It was `[]`, meaning every state, which PNCP accepts as an omitted `uf`. The configured scope is what the budget tests price, and the discovery job now **refuses to start** with an empty set rather than attempting a national run: that needs a different invocation shape, recorded as a design limit in [ADR 0010](adr/0010-ingestion-runs-daily.md). |
 
 ### What the lookback overlap actually costs
 

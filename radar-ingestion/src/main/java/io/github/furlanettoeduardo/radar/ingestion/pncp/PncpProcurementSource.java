@@ -6,6 +6,8 @@ import io.github.furlanettoeduardo.radar.domain.port.ProcurementQuery;
 import io.github.furlanettoeduardo.radar.domain.port.ProcurementSource;
 import io.github.furlanettoeduardo.radar.domain.procurement.Procurement;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -83,6 +85,51 @@ public final class PncpProcurementSource implements ProcurementSource, Procureme
     opening.forEach(page -> map(page, fetched));
     rest.forEach(page -> map(page, fetched));
     return List.copyOf(fetched);
+  }
+
+  /**
+   * One chunk: a single publication date, modality and state, paginated to completion.
+   *
+   * <p>Still two phases, because PNCP only reveals the page count in the first answer, but both now
+   * spend one budget that belongs to the whole run rather than to this chunk. The cap applies to
+   * this chunk alone, which is what stops a modality whose volume was underestimated from
+   * truncating everything else in the run.
+   */
+  @Override
+  public ChunkFetch fetchChunk(
+      LocalDate publicationDate, int modalityCode, BrazilianState state, Instant deadline) {
+    StructuredFanOut.Budget budget = new StructuredFanOut.Budget(deadline);
+    PncpPageRequest first =
+        new PncpPageRequest(publicationDate, publicationDate, Optional.of(state), modalityCode, 1);
+
+    List<PncpPage> opening = fanOut.runAll(List.of(first), pageClient::fetch, budget);
+    int totalPages = opening.get(0).totalPages();
+    requireChunkWithinCap(totalPages, publicationDate, modalityCode, state);
+
+    List<PncpPageRequest> remaining = new ArrayList<>();
+    for (int page = 2; page <= totalPages; page++) {
+      remaining.add(
+          new PncpPageRequest(
+              publicationDate, publicationDate, Optional.of(state), modalityCode, page));
+    }
+    List<PncpPage> rest = fanOut.runAll(remaining, pageClient::fetch, budget);
+
+    List<FetchedProcurement> fetched = new ArrayList<>();
+    opening.forEach(page -> map(page, fetched));
+    rest.forEach(page -> map(page, fetched));
+    return new ChunkFetch(List.copyOf(fetched), 1 + remaining.size());
+  }
+
+  private void requireChunkWithinCap(
+      int pages, LocalDate publicationDate, int modalityCode, BrazilianState state) {
+    if (pages > properties.maxPagesPerChunk()) {
+      throw new PncpFanOutTooLargeException(
+          ("%s modality %d in %s needs %d pages, over the per-chunk maximum of %d. That modality "
+                  + "is busier than it was measured to be; re-measure it rather than raising the "
+                  + "cap.")
+              .formatted(
+                  publicationDate, modalityCode, state, pages, properties.maxPagesPerChunk()));
+    }
   }
 
   private List<PncpPageRequest> firstPageOfEachCombination(ProcurementQuery query) {
