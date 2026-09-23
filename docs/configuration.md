@@ -283,6 +283,36 @@ circuit open and fails immediately instead of repeating the discovery.
 Revisit when there is production evidence about the shape of PNCP's failures. Until then this is a
 decision on record rather than an untouched default.
 
+## Memory, measured with the listener live
+
+The constraint is a t3.micro: 1 GB of RAM, two JVMs at `-Xmx256m`, and a stated ceiling of **400
+MiB** for the pair before this stops being viable.
+
+Measured 2026-09-23, `docker compose up`, both services healthy and idle, two readings about two
+and a half minutes apart:
+
+| Container | RSS | Note |
+| --- | --- | --- |
+| `radar-api` | **157.4 MiB** | unchanged in substance since stage 1 |
+| `radar-ingestion` | **193.1 MiB** | now carries JDBC and HikariCP, ShedLock, and the SQS listener container |
+| **Both JVMs** | **350.5 MiB** | **against a 400 MiB ceiling** |
+| `radar-postgres` | 28.9 MiB | local only; production uses RDS |
+| `radar-localstack` | 421.3 MiB | local only; production uses real SQS |
+
+**Under the ceiling, with about 50 MiB of headroom — roughly 12%.** That is not much. The things
+that would spend it:
+
+- another Hikari pool, or raising `maximum-pool-size` above 5;
+- a second SQS listener container, since each has its own polling threads and buffers;
+- anything that adds a framework rather than a class.
+
+`radar-ingestion` is now 36 MiB heavier than `radar-api` and it is the one still growing: stage 5
+adds LLM enrichment to it. **The next thing added to that service should be measured before it is
+merged, not after.**
+
+Only the two JVMs count toward the ceiling. Postgres is RDS in production and LocalStack does not
+exist there; both appear above only because `docker compose up` runs the whole thing locally.
+
 ## Scoring — the domain
 
 | Setting | Value | Label | Basis |

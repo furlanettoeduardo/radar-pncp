@@ -49,6 +49,24 @@ services:
       retries: 12
       start_period: 45s
 
+  localstack:
+    # Local SQS. Production talks to real SQS in us-east-1; only the endpoint differs, which is why
+    # the publisher and the listener have no branch in them for this.
+    image: localstack/localstack:3
+    container_name: radar-localstack
+    environment:
+      SERVICES: sqs
+      AWS_DEFAULT_REGION: us-east-1
+    ports:
+      - "${RADAR_LOCALSTACK_PORT:-4566}:4566"
+    volumes:
+      - ./docker/localstack/create-queues.sh:/etc/localstack/init/ready.d/create-queues.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal sqs get-queue-url --queue-name radar-procurement-discovered"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
   radar-ingestion:
     build:
       context: .
@@ -61,10 +79,17 @@ services:
       # writes a schema it does not create.
       radar-api:
         condition: service_healthy
+      # And for the queues, because the listener resolves them at startup and fails without them.
+      localstack:
+        condition: service_healthy
     environment:
       RADAR_DB_URL: jdbc:postgresql://postgres:5432/radar
       RADAR_DB_USERNAME: radar
       RADAR_DB_PASSWORD: radar
+      SPRING_CLOUD_AWS_SQS_ENDPOINT: http://localstack:4566
+      SPRING_CLOUD_AWS_REGION_STATIC: us-east-1
+      SPRING_CLOUD_AWS_CREDENTIALS_ACCESS_KEY: test
+      SPRING_CLOUD_AWS_CREDENTIALS_SECRET_KEY: test
       JAVA_TOOL_OPTIONS: -Xmx256m
     ports:
       - "${RADAR_INGESTION_PORT:-8081}:8081"
