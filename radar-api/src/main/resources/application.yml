@@ -12,7 +12,13 @@ spring:
     username: ${RADAR_DB_USERNAME:radar}
     password: ${RADAR_DB_PASSWORD:radar}
     hikari:
-      # Sized for a t3.micro, not for throughput. Raise it when a load test asks for it.
+      # Explicit, not Hikari's default of 10. Sized for a t3.micro, not for throughput.
+      #
+      # db.t4g.micro derives max_connections from LEAST(DBInstanceClassMemory/9531392, 5000),
+      # which reads as roughly 112 on a 1 GiB instance. The real figure is lower:
+      # DBInstanceClassMemory is what the instance has left after RDS overhead, not the full
+      # gibibyte. Stage 8 confirms it with SHOW max_connections rather than trusting the formula.
+      # Against even the pessimistic reading, 5 here plus 5 in radar-ingestion is comfortable.
       maximum-pool-size: 5
       minimum-idle: 1
   flyway:

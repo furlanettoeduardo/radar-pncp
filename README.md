@@ -6,13 +6,16 @@ enriches them with an LLM, and matches them against company profiles.
 Two Spring Boot services, one t3.micro, inside the AWS free tier. The constraint is the point:
 every dependency and every AWS service in this repository had to earn its place in 1 GB of RAM.
 
-> **Status: stage 03 complete, the PNCP adapter.** The build, the module boundaries, the domain
-> model, the scoring engine and the PNCP HTTP adapter exist and are tested. The adapter fetches and
-> maps real notices, bounded by a concurrency cap, a fan-out cap and a whole-operation deadline.
-> Nothing is persisted, queued or enriched yet: two of the three ports the domain declares still
-> have no implementation. Stage 04 is next. See [docs/architecture.md](docs/architecture.md) for
-> what is built and what is planned, [docs/configuration.md](docs/configuration.md) for which of
-> the numbers are evidence, and [docs/adr](docs/adr) for why.
+> **Status: stage 04 complete, ingestion end to end.** Notices are discovered from PNCP, published
+> to SQS and stored in PostgreSQL, on a schedule, without losing a day quietly. Discovery is chunked
+> by publication date and modality, so one failed page no longer discards a whole run — against an
+> API measured failing 36 of 42 calls in an afternoon, that mattered. A date that leaves the lookback
+> window uncovered becomes a named, alertable event rather than an absence. The consumer is
+> idempotent and tells a poisoned message apart from a database outage, so a maintenance reboot does
+> not fill the dead letter queue. Enrichment and the API are next. See
+> [docs/architecture.md](docs/architecture.md) for what is built and what is planned,
+> [docs/configuration.md](docs/configuration.md) for which of the numbers are evidence,
+> [docs/runbook.md](docs/runbook.md) for operating it, and [docs/adr](docs/adr) for why.
 
 ## Stack
 

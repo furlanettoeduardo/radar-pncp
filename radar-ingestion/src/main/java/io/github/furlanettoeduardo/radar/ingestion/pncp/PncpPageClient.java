@@ -66,7 +66,15 @@ public final class PncpPageClient {
     this.properties = Objects.requireNonNull(properties, "the PNCP client needs its properties");
 
     HttpClient httpClient =
-        HttpClient.newBuilder().connectTimeout(properties.connectTimeout()).build();
+        HttpClient.newBuilder()
+            // Pinned to HTTP/1.1. Left on the JDK default of HTTP/2, a 4xx was observed being
+            // sent twice against a plain-HTTP server, reproducibly: the class failed 2 of 2 runs
+            // without this line and passed with it. Duplicating every refused request against a
+            // public API is not a cost worth paying for multiplexing we do not use at 8
+            // concurrent requests.
+            .version(HttpClient.Version.HTTP_1_1)
+            .connectTimeout(properties.connectTimeout())
+            .build();
     JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
     requestFactory.setReadTimeout(properties.readTimeout());
 

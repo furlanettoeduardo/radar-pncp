@@ -45,7 +45,9 @@ class RadarApiApplicationIT {
                 + " installed_rank",
             String.class);
 
-    assertThat(applied).containsExactly("1");
+    assertThat(applied)
+        .as("every migration in db/migration, in order, and none of them failed")
+        .containsExactly("1", "2", "3", "4");
   }
 
   @Test

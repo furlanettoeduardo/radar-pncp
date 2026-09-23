@@ -51,7 +51,8 @@ class PncpProcurementMapperTest {
     assertThat(mapped.fetched().rawPayload()).contains("numeroControlePNCP");
     assertThat(mapped.fetched().procurement().sourcePayloadHash())
         .isEqualTo(CanonicalJsonHash.of(firstRecordedNotice()));
-    assertThat(mapped.fetched().sourceUpdatedAt()).contains(Instant.parse("2026-09-01T17:22:01Z"));
+    assertThat(mapped.fetched().procurement().sourceUpdatedAt())
+        .contains(Instant.parse("2026-09-01T17:22:01Z"));
   }
 
   @Test
@@ -100,16 +101,55 @@ class PncpProcurementMapperTest {
   }
 
   @Test
-  @DisplayName("a missing closing date is rejected: the deadline rule cannot run without it")
-  void rejectsAMissingClosingDate() {
-    assertRejectedOn(withoutField("dataEncerramentoProposta"), "dataEncerramentoProposta");
+  @DisplayName("half a proposal window is rejected as malformed, not skipped as unbiddable")
+  void rejectsAHalfWindow() {
+    assertRejectedOn(withoutField("dataEncerramentoProposta"), "proposalWindow");
+    assertRejectedOn(withoutField("dataAberturaProposta"), "proposalWindow");
   }
 
   @Test
-  @DisplayName("a missing opening or publication date is rejected too")
-  void rejectsOtherMissingDates() {
-    assertRejectedOn(withoutField("dataAberturaProposta"), "dataAberturaProposta");
+  @DisplayName("a missing publication date is still rejected: it is not part of the window")
+  void rejectsAMissingPublicationDate() {
     assertRejectedOn(withoutField("dataPublicacaoPncp"), "dataPublicacaoPncp");
+  }
+
+  @Test
+  @DisplayName("a notice with no proposal window at all is not biddable, which is not an error")
+  void aNoticeWithoutAWindowIsNotBiddable() {
+    ObjectNode notice = firstRecordedNoticeCopy();
+    notice.remove("dataAberturaProposta");
+    notice.remove("dataEncerramentoProposta");
+
+    assertThat(mapper.map(notice))
+        .isInstanceOfSatisfying(
+            MappingResult.NotBiddable.class,
+            skipped -> {
+              assertThat(skipped.controlNumber()).isEqualTo("44935278000126-1-000343/2025");
+              assertThat(skipped.reason()).contains("no proposal window");
+            });
+  }
+
+  @Test
+  @DisplayName("the recorded modality 8 page keeps one notice, skips nine, and rejects none")
+  void theRecordedDispensaPageKeepsOneAndSkipsNine() throws Exception {
+    JsonNode page =
+        JSON.readTree(SampleFixtures.read("contratacoes-publicacao-mod8-SP-p1.json")).get("data");
+
+    int mapped = 0;
+    int notBiddable = 0;
+    int rejected = 0;
+    for (JsonNode notice : page) {
+      switch (mapper.map(notice)) {
+        case MappingResult.Mapped ignored -> mapped++;
+        case MappingResult.NotBiddable ignored -> notBiddable++;
+        case MappingResult.Rejected ignored -> rejected++;
+      }
+    }
+
+    assertThat(page).hasSize(10);
+    assertThat(mapped).as("notices a supplier could actually bid on").isEqualTo(1);
+    assertThat(notBiddable).as("dispensas with no proposal window").isEqualTo(9);
+    assertThat(rejected).as("nothing here is malformed; it is simply what a dispensa is").isZero();
   }
 
   @Test
@@ -135,14 +175,14 @@ class PncpProcurementMapperTest {
     MappingResult result = mapper.map(withoutField("dataAtualizacaoGlobal"));
 
     assertThat(result).isInstanceOf(MappingResult.Mapped.class);
-    assertThat(((MappingResult.Mapped) result).fetched().sourceUpdatedAt()).isEmpty();
+    assertThat(((MappingResult.Mapped) result).fetched().procurement().sourceUpdatedAt()).isEmpty();
   }
 
   @Test
   @DisplayName("a rejection still names the notice it came from, so it can be chased")
   void aRejectionNamesTheNotice() {
     MappingResult.Rejected rejected =
-        (MappingResult.Rejected) mapper.map(withoutField("dataEncerramentoProposta"));
+        (MappingResult.Rejected) mapper.map(withoutField("dataPublicacaoPncp"));
 
     assertThat(rejected.controlNumber()).isEqualTo("44935278000126-1-000343/2025");
   }
@@ -151,13 +191,11 @@ class PncpProcurementMapperTest {
   @DisplayName("a rejection says which kind of absence it was, since they have different causes")
   void aRejectionDistinguishesAbsentFromNullFromBlank() {
     ObjectNode blank = firstRecordedNoticeCopy();
-    blank.put("dataEncerramentoProposta", "  ");
+    blank.put("dataPublicacaoPncp", "  ");
 
-    assertThat(
-            ((MappingResult.Rejected) mapper.map(withoutField("dataEncerramentoProposta")))
-                .reason())
+    assertThat(((MappingResult.Rejected) mapper.map(withoutField("dataPublicacaoPncp"))).reason())
         .isEqualTo("required field is absent from the payload");
-    assertThat(((MappingResult.Rejected) mapper.map(withNull("dataEncerramentoProposta"))).reason())
+    assertThat(((MappingResult.Rejected) mapper.map(withNull("dataPublicacaoPncp"))).reason())
         .isEqualTo("required field is present but null");
     assertThat(((MappingResult.Rejected) mapper.map(blank)).reason())
         .isEqualTo("required field is present but blank");

@@ -111,17 +111,20 @@ class PncpLiveSmokeTest {
 
     PncpProcurementMapper mapper = new PncpProcurementMapper();
     List<Procurement> mapped = new ArrayList<>();
+    List<MappingResult.NotBiddable> notBiddable = new ArrayList<>();
     List<MappingResult.Rejected> rejected = new ArrayList<>();
     for (JsonNode notice : page.notices()) {
       switch (mapper.map(notice)) {
         case MappingResult.Mapped ok -> mapped.add(ok.fetched().procurement());
+        case MappingResult.NotBiddable skipped -> notBiddable.add(skipped);
         case MappingResult.Rejected no -> rejected.add(no);
       }
     }
 
-    report(from, to, page, mapped, rejected);
+    report(from, to, page, mapped, notBiddable, rejected);
 
-    assertThat(mapped.size() + rejected.size()).isEqualTo(page.notices().size());
+    assertThat(mapped.size() + notBiddable.size() + rejected.size())
+        .isEqualTo(page.notices().size());
   }
 
   private static void report(
@@ -129,6 +132,7 @@ class PncpLiveSmokeTest {
       LocalDate to,
       PncpPage page,
       List<Procurement> mapped,
+      List<MappingResult.NotBiddable> notBiddable,
       List<MappingResult.Rejected> rejected) {
 
     StringBuilder out = new StringBuilder("\n");
@@ -138,6 +142,7 @@ class PncpLiveSmokeTest {
     out.append("totalPaginas      : %d%n".formatted(page.totalPages()));
     out.append("records on page 1 : %d%n".formatted(page.notices().size()));
     out.append("mapped            : %d%n".formatted(mapped.size()));
+    out.append("not biddable      : %d   (no proposal window)%n".formatted(notBiddable.size()));
     out.append("rejected          : %d%n".formatted(rejected.size()));
 
     rejected.forEach(

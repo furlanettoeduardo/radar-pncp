@@ -1,4 +1,11 @@
 spring:
+  cloud:
+    aws:
+      region:
+        # us-east-1 for everything, because that is the region this free tier covers and
+        # cross-region transfer is billed. The ~150ms extra to reach PNCP is paid once per page by
+        # a daily batch, about 4-6s on a run with a 5 minute deadline. See docs/adr/0011.
+        static: ${AWS_REGION:us-east-1}
   application:
     name: radar-ingestion
   threads:
@@ -7,23 +14,86 @@ spring:
       enabled: true
   main:
     banner-mode: off
+  datasource:
+    url: ${RADAR_DB_URL:jdbc:postgresql://localhost:5432/radar}
+    username: ${RADAR_DB_USERNAME:radar}
+    password: ${RADAR_DB_PASSWORD:radar}
+    hikari:
+      # 5 here plus 5 in radar-api, which is the split radar-api's own comment already assumed.
+      maximum-pool-size: 5
+      minimum-idle: 1
+  flyway:
+    # radar-api owns the schema and is the only process that migrates. Two services racing to
+    # apply the same migrations on startup is a deadlock waiting for an unlucky restart order,
+    # and a second owner of the schema is a second opinion about what it should be.
+    enabled: false
 
 radar:
+  queues:
+    procurement-discovered: ${RADAR_PROCUREMENT_QUEUE:radar-procurement-discovered}
+  consumer:
+    # On by default. A switch rather than a constant because the two halves of this service can be
+    # deployed apart: a producer-only instance needs no queue to listen on, and a consumer-only one
+    # is how a backlog gets drained without also discovering more work. Tests that want neither
+    # turn it off rather than arranging a queue they have no use for.
+    enabled: ${RADAR_CONSUMER_ENABLED:true}
+    # SQS queue attributes, owned by stage 8's Terraform and mirrored here because the consumer has
+    # to agree with them. The integration tests create their queue from these values.
+    #
+    # 30s: the work behind one message is a single database round trip, measured in milliseconds,
+    # so this is about a hundred times the expected handling time. It is also the base of the
+    # transient-failure backoff, which is why it is not simply "as small as possible".
+    visibility-timeout: 30s
+    # 3 receives, then the redrive policy moves the message to the dead letter queue. Kept low on
+    # purpose: a genuinely poisoned message should stop being retried quickly and become visible.
+    # A database outage no longer burns these, because a transient failure extends the message's
+    # visibility rather than failing immediately. See ADR 0012.
+    max-receive-count: 3
+  discovery:
+    # Overlaps the schedule deliberately rather than matching it. A run that looks back exactly as
+    # far as the interval loses everything published during an outage. The overlap is free on the
+    # storage side, because the consumer deduplicates on content hash, and NOT free on the request
+    # side: it is a full extra day of pages on every run. See docs/configuration.md.
+    #
+    # This is 3 days of lookback but FOUR calendar days of pages: dataInicial and dataFinal are
+    # inclusive, and the window runs today-3 through today.
+    #
+    # Sized for reliability, not for volume. A publication date is only covered by a cycle that ran
+    # AFTER it closed, so a lookback of N gives N-1 covering cycles: 3 survives two consecutive
+    # lost days, and the likeliest lost day is this single instance being down rather than PNCP.
+    # The late-arrival distribution is what revisits this number. See ADR 0010.
+    lookback-days: 3
+    # SP only, which is the scope this project actually serves. It was [] - every state - which
+    # PNCP accepts as an omitted uf, and at the measured volumes a national run needs about 440
+    # pages of a 500 cap with no margin left. National scope is a design limit rather than a
+    # setting: see docs/adr/0010-ingestion-runs-daily.md for what has to change first.
+    states: [SP]
   pncp:
     base-url: https://pncp.gov.br/api/consulta
-    # PNCP requires codigoModalidadeContratacao on every call, and 6 is the only value the
-    # recorded samples evidence. A list from day one, so adding codes is config rather than code.
-    # Known limitation: the system therefore sees one modality out of PNCP's catalogue.
+    # PNCP requires codigoModalidadeContratacao on every call. Measured 2026-09-23 on SP over
+    # 2026-09-15..21: modality 6 is 24.4 pages a day and modality 8 is 49.1, both counted.
+    # Modality 4 is an ESTIMATE bounded at 4 a day: its seven day query failed four times, and a
+    # day by day retry hit 21 consecutive zero-byte hangs. Chunking makes that safe to configure,
+    # since an underestimate fails one chunk against its cap instead of truncating a run.
     modality-codes:
+      - 4
       - 6
-    # The only page size any sample evidences. Raising it is the single largest lever on request
-    # volume, and there is no evidence yet that PNCP accepts more.
+      - 8
+    # PNCP does accept 50, verified 2026-09-23, and it is the single largest lever on request
+    # volume. Kept at 10 anyway: time to first byte was 3.7s at 50 against 0.35-1.04s at 10, so
+    # latency scales with page size and the saving is 5x fewer requests rather than less server
+    # time - while leaving the 10s read timeout only ~2.7x headroom. Revisit with production
+    # latency data in stage 8. See ADR 0010.
     page-size: 10
-    # Caps the whole fan-out, not just how much runs at once. One week of SP alone is 170 pages,
-    # and a daily all-states run is an estimated 100-160, so this is roughly 3x normal operation.
-    # A multi-day catch-up belongs in chunking the window, not in loosening this. See ADR 0008.
-    max-total-pages: 500
+    # Caps ONE chunk: one publication date, one modality, one state. The largest chunk is a peak
+    # day of modality 8, about 71 pages, so this is roughly 7x it. It no longer moves with the
+    # lookback, which is what chunking bought. See ADR 0008 and ADR 0010.
+    max-pages-per-chunk: 500
     max-concurrent-requests: 8
+    # Both measured on 2026-09-23 (n=5): connect took 0.05-0.09s, time to first byte 0.35-1.04s
+    # at page size 10. Two calls also hung with zero bytes for 60s and ~7min, which is what
+    # read-timeout bounds and the reason to keep it low rather than raise it. Of 17 calls that day
+    # 11 failed outright. See docs/configuration.md.
     connect-timeout: 2s
     read-timeout: 10s
     # Bounds a whole invocation, which per request timeouts do not. A healthy run at the cap is

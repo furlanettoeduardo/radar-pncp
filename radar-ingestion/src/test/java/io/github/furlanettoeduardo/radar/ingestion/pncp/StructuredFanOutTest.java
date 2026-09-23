@@ -7,6 +7,9 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
@@ -35,15 +38,23 @@ class StructuredFanOutTest {
   }
 
   /**
-   * Overlap is made real by holding every subtask long enough that they must contend. Counting
-   * total calls would prove nothing about the ceiling; only the observed maximum in flight does.
+   * Overlap is forced rather than hoped for. Each job counts down a latch sized to the cap and then
+   * waits on it, so the batch can only make progress once exactly {@code cap} jobs are in flight
+   * together. That makes the assertion deterministic and stronger than "did not exceed": a cap that
+   * was too low would deadlock the latch and time out, and one that was too high would push the
+   * high water mark above it.
+   *
+   * <p>An earlier version slept instead and asserted overlap above one. That measured whatever the
+   * machine happened to schedule, which is not a property of the code under test.
    */
   @Test
-  @DisplayName("never exceeds the concurrency cap, measured by maximum observed overlap")
-  void neverExceedsTheConcurrencyCap() {
+  @DisplayName("runs exactly as many jobs at once as the cap allows, no more and no fewer")
+  void honoursTheConcurrencyCapExactly() {
     int cap = 3;
     AtomicInteger inFlight = new AtomicInteger();
     AtomicInteger highWaterMark = new AtomicInteger();
+    CountDownLatch capReached = new CountDownLatch(cap);
+    AtomicInteger latchTimeouts = new AtomicInteger();
 
     fanOut(cap)
         .runAll(
@@ -51,16 +62,31 @@ class StructuredFanOutTest {
             input -> {
               int now = inFlight.incrementAndGet();
               highWaterMark.accumulateAndGet(now, Math::max);
-              sleep(Duration.ofMillis(40));
+              capReached.countDown();
+              try {
+                if (!capReached.await(5, TimeUnit.SECONDS)) {
+                  latchTimeouts.incrementAndGet();
+                }
+              } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("interrupted", interrupted);
+              }
               inFlight.decrementAndGet();
               return input;
             });
 
-    assertThat(highWaterMark.get()).isLessThanOrEqualTo(cap);
-    // And the work really did overlap, or the assertion above would be vacuous.
-    assertThat(highWaterMark.get()).isGreaterThan(1);
+    assertThat(latchTimeouts.get())
+        .as("a cap below %d would never let %d jobs run together", cap, cap)
+        .isZero();
+    assertThat(highWaterMark.get()).isEqualTo(cap);
   }
 
+  /**
+   * Supplementary evidence, not proof. The threads are released together by a barrier, but nothing
+   * forces them to interleave at the moment that matters, so this passes whether or not they
+   * actually contended. The forced-interleaving tests above are what prove the behaviour; this one
+   * exists to catch anything that only breaks under real concurrency.
+   */
   @Test
   @DisplayName("every started subtask has terminated by the time the failure propagates")
   void everyStartedSubtaskTerminatesBeforeTheFailurePropagates() {
@@ -132,7 +158,7 @@ class StructuredFanOutTest {
                           }
                         }))
         .isInstanceOf(FanOutTimedOutException.class)
-        .hasMessageContaining("did not finish within")
+        .hasMessageContaining("ran out of the operation budget")
         .hasMessageContaining("40 jobs");
 
     // Same shape as the cancellation proof: nothing is still running when the failure surfaces.
@@ -140,33 +166,51 @@ class StructuredFanOutTest {
     assertThat(started).isNotEmpty();
   }
 
+  /**
+   * The latch closes a narrow race, so this is built tightly enough to see it.
+   *
+   * <p>Shutting the scope down already stops jobs still waiting on a permit, because {@code
+   * Semaphore.acquire} is interruptible. The remaining gap is that a failing job releases its
+   * permit in a {@code finally} <em>before</em> the scope has processed the failure, so a waiting
+   * job can take the freed permit in between.
+   *
+   * <p>Two things make that observable. The cap is one, so exactly one job runs at a time and a
+   * single job slipping through is the difference between empty and not. And whichever job wins the
+   * permit race is the one that fails, rather than a job chosen by index: forking is ordered,
+   * acquiring is not, and an earlier version of this test broke one run in five purely because it
+   * assumed otherwise.
+   */
   @Test
-  @DisplayName("once one job has failed, no further job starts work")
-  void noFurtherJobStartsWorkAfterTheFirstFailure() {
-    int cap = 2;
-    Set<Integer> enteredWork = ConcurrentHashMap.newKeySet();
+  @DisplayName("no job starts work once a sibling has established the upstream is down")
+  void noJobStartsWorkOnceTheUpstreamIsKnownDown() {
+    int iterations = 10;
 
-    assertThatThrownBy(
-            () ->
-                new StructuredFanOut(cap, Duration.ofSeconds(30))
-                    .runAll(
-                        IntStream.rangeClosed(1, 40).boxed().toList(),
-                        input -> {
-                          if (input == 1) {
-                            sleep(Duration.ofMillis(50));
-                            throw new PncpUnavailableException("PNCP is down");
-                          }
-                          enteredWork.add(input);
-                          // A whole retry budget, the thing we do not want repeated 39 times.
-                          sleep(Duration.ofMillis(300));
-                          return input;
-                        }))
-        .isInstanceOf(PncpUnavailableException.class);
+    for (int iteration = 1; iteration <= iterations; iteration++) {
+      Set<Integer> enteredWork = ConcurrentHashMap.newKeySet();
+      AtomicBoolean firstToRun = new AtomicBoolean(true);
 
-    // Only jobs already holding a permit when the failure landed may have started.
-    assertThat(enteredWork)
-        .as("jobs that started work after the upstream was known to be down")
-        .hasSizeLessThanOrEqualTo(cap);
+      assertThatThrownBy(
+              () ->
+                  new StructuredFanOut(1, Duration.ofSeconds(30))
+                      .runAll(
+                          IntStream.rangeClosed(1, 20).boxed().toList(),
+                          input -> {
+                            if (firstToRun.compareAndSet(true, false)) {
+                              sleep(Duration.ofMillis(50));
+                              throw new PncpUnavailableException("PNCP is down");
+                            }
+                            enteredWork.add(input);
+                            sleep(Duration.ofMillis(100));
+                            return input;
+                          }))
+          .isInstanceOf(PncpUnavailableException.class);
+
+      assertThat(enteredWork)
+          .as(
+              "iteration %d: jobs that worked against an upstream already known to be down",
+              iteration)
+          .isEmpty();
+    }
   }
 
   private static StructuredFanOut fanOut(int maxConcurrent) {

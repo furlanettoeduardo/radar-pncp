@@ -16,7 +16,8 @@ public record Procurement(
     Instant publishedAt,
     Instant proposalOpensAt,
     Instant proposalClosesAt,
-    String sourcePayloadHash) {
+    String sourcePayloadHash,
+    Optional<Instant> sourceUpdatedAt) {
 
   public Procurement {
     Objects.requireNonNull(controlNumber, "a procurement must have a control number");
@@ -29,6 +30,8 @@ public record Procurement(
     Objects.requireNonNull(proposalOpensAt, "a procurement must have a proposal opening time");
     Objects.requireNonNull(proposalClosesAt, "a procurement must have a proposal closing time");
     Objects.requireNonNull(sourcePayloadHash, "a procurement must carry its source hash");
+    Objects.requireNonNull(
+        sourceUpdatedAt, "source updated at must not be null, use Optional.empty()");
     if (proposalClosesAt.isBefore(proposalOpensAt)) {
       throw new IllegalArgumentException(
           "a proposal window cannot close before it opens: %s then %s"

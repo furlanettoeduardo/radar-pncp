@@ -3,6 +3,12 @@ package io.github.furlanettoeduardo.radar.ingestion.pncp;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -52,6 +58,49 @@ class CanonicalJsonHashTest {
 
     assertThat(hash).hasSize(64).matches("[0-9a-f]{64}");
     assertThat(hash).isEqualTo(CanonicalJsonHash.of(payload));
+  }
+
+  @Test
+  @DisplayName("the same notice fetched twice hashes identically, however the response was framed")
+  void theSameNoticeFetchedTwiceHashesIdentically() throws Exception {
+    // What a first fetch returned.
+    JsonNode firstFetch =
+        PncpJson.mapper().readTree(SampleFixtures.read("contratacoes-publicacao.json")).get("data");
+
+    // What a second fetch of the same notices could legitimately look like: identical content,
+    // fields emitted in a different order, pretty printed. Nothing about the notices changed.
+    String secondFetch =
+        PncpJson.mapper()
+            .writerWithDefaultPrettyPrinter()
+            .writeValueAsString(reverseKeys(firstFetch));
+    JsonNode reparsed = PncpJson.mapper().readTree(secondFetch);
+
+    for (int notice = 0; notice < firstFetch.size(); notice++) {
+      assertThat(CanonicalJsonHash.of(reparsed.get(notice)))
+          .as(
+              "notice %d must hash the same on a second fetch, or every re-read looks like a"
+                  + " change",
+              notice)
+          .isEqualTo(CanonicalJsonHash.of(firstFetch.get(notice)));
+    }
+  }
+
+  /** Rebuilds the tree with every object's fields in the opposite order, content untouched. */
+  private static JsonNode reverseKeys(JsonNode node) {
+    if (node.isObject()) {
+      List<String> names = new ArrayList<>();
+      node.fieldNames().forEachRemaining(names::add);
+      Collections.reverse(names);
+      ObjectNode reordered = PncpJson.mapper().createObjectNode();
+      names.forEach(name -> reordered.set(name, reverseKeys(node.get(name))));
+      return reordered;
+    }
+    if (node.isArray()) {
+      ArrayNode rebuilt = PncpJson.mapper().createArrayNode();
+      node.forEach(child -> rebuilt.add(reverseKeys(child)));
+      return rebuilt;
+    }
+    return node;
   }
 
   @Test

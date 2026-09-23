@@ -45,6 +45,11 @@ import java.util.function.Function;
  * enough jobs keep an invocation alive for as long as the arithmetic allows. The deadline is the
  * bound, and it matters most once a scheduler is periodically triggering this: an unbounded job
  * under a periodic trigger is how runs begin overlapping.
+ *
+ * <p>A deadline is a {@link Budget} rather than a duration for one reason: an operation made of
+ * several fan outs must spend <em>one</em> budget across all of them. Taking the duration afresh
+ * per fan out is the obvious implementation and it is wrong — a two phase operation then runs for
+ * twice the configured deadline, which is what {@code PncpRunIsBoundedTest} caught and now guards.
  */
 public final class StructuredFanOut {
 
@@ -73,7 +78,34 @@ public final class StructuredFanOut {
     }
   }
 
+  /**
+   * What is left of one operation's time, as an absolute instant.
+   *
+   * <p>Absolute rather than a duration so that it can be handed to every phase of an operation and
+   * mean the same thing to each of them. A caller that starts a new budget per phase has quietly
+   * multiplied its own deadline by the number of phases.
+   */
+  public record Budget(Instant expiresAt) {
+    public Budget {
+      Objects.requireNonNull(expiresAt, "a budget must expire at some point");
+    }
+  }
+
+  /** Opens a budget of the configured deadline, starting now. Once per operation, not per phase. */
+  public Budget startBudget() {
+    return new Budget(Instant.now().plus(deadline));
+  }
+
+  /**
+   * Convenience for an operation that is a single fan out, which is its own whole operation. An
+   * operation with more than one phase must open a {@link Budget} once and pass it to each phase.
+   */
   public <T, R> List<R> runAll(List<T> inputs, Function<T, R> job) {
+    return runAll(inputs, job, startBudget());
+  }
+
+  public <T, R> List<R> runAll(List<T> inputs, Function<T, R> job, Budget budget) {
+    Objects.requireNonNull(budget, "a fan out must be given a budget to spend");
     if (inputs.isEmpty()) {
       return List.of();
     }
@@ -107,7 +139,7 @@ public final class StructuredFanOut {
                           }))
               .toList();
 
-      scope.joinUntil(Instant.now().plus(deadline));
+      scope.joinUntil(budget.expiresAt());
       // Rethrow what actually failed rather than a wrapper: the caller distinguishes an
       // unavailable PNCP from a refused request, and a wrapper would hide that.
       scope.throwIfFailed(
@@ -128,7 +160,8 @@ public final class StructuredFanOut {
       // Closing the scope on the way out interrupts every unfinished subtask and waits for it, so
       // this propagates with nothing still running, exactly as a job failure does.
       throw new FanOutTimedOutException(
-          "the fan out of %d jobs did not finish within %s".formatted(inputs.size(), deadline));
+          "the fan out of %d jobs ran out of the operation budget of %s"
+              .formatted(inputs.size(), deadline));
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException("interrupted while fanning out", interrupted);

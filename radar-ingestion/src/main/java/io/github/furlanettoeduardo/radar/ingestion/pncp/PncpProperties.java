@@ -13,8 +13,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * that is all this system polls. Which modalities PNCP splits its catalogue into is a PNCP fact
  * rather than a domain concept, which is why it lives here and not in a query.
  *
- * <p>{@code maxTotalPages} caps the whole fan-out, not just how much of it runs at once. A wide
- * date range across every state is thousands of requests against a public API run by a public body.
+ * <p>{@code maxPagesPerChunk} caps one chunk: a single publication date of a single modality in a
+ * single state, paginated to completion. It was a cap on a whole run, which coupled it to the
+ * lookback; with a run made of independent chunks the largest thing that can be attempted no longer
+ * grows with the window. What it still protects against is a modality whose volume was
+ * underestimated, which now fails one chunk loudly instead of truncating a run.
  *
  * <p>{@code operationDeadline} bounds a whole invocation. Per request timeouts bound one call; at
  * the cap the arithmetic is unkind, and a degraded PNCP could otherwise keep one run alive for over
@@ -28,7 +31,7 @@ public record PncpProperties(
     String baseUrl,
     List<Integer> modalityCodes,
     int pageSize,
-    int maxTotalPages,
+    int maxPagesPerChunk,
     int maxConcurrentRequests,
     Duration connectTimeout,
     Duration readTimeout,
@@ -48,7 +51,7 @@ public record PncpProperties(
     }
     modalityCodes = List.copyOf(modalityCodes);
     requirePositive(pageSize, "page-size");
-    requirePositive(maxTotalPages, "max-total-pages");
+    requirePositive(maxPagesPerChunk, "max-pages-per-chunk");
     requirePositive(maxConcurrentRequests, "max-concurrent-requests");
     if (connectTimeout.isNegative() || connectTimeout.isZero()) {
       throw new IllegalArgumentException("radar.pncp.connect-timeout must be positive");
