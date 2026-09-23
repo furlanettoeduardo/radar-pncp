@@ -12,26 +12,45 @@ and [ADR 0008](adr/0008-virtual-threads-and-structured-concurrency-for-page-fetc
 
 | Setting | Default | Label | Basis |
 | --- | --- | --- | --- |
-| `page-size` | `10` | **Weakly evidenced** | `tamanhoPagina=10` appears in all five recorded request URLs. That is evidence 10 *works*, not that it is the maximum or the best choice — it was copied. No evidence exists about the ceiling, and this is the single largest lever on total request volume. |
-| `max-total-pages` | `500` | **Evidenced base, estimated multiplier** | The base is real: `contratacoes/publicacao` reports `totalPaginas: 170` for one week of SP at modality 6. The national daily figure of 100–160 pages is an extrapolation from SP's share of Brazilian municipalities, not a measurement. 500 is roughly three times that. |
-| `modality-codes` | `[6]` | **Evidenced, and a known limitation** | 6 is the only `codigoModalidadeContratacao` any sample uses. PNCP rejects the call without one. The system therefore sees a fraction of PNCP's catalogue, deliberately, rather than inventing the rest of the table. |
+| `page-size` | `10` | **Measured, and deliberately not raised** | PNCP also accepts `tamanhoPagina=50`, verified 2026-09-23: modality 8 over the same week came back as 69 pages instead of 344. Kept at 10 because **latency scales with page size** — time to first byte was 3.7s at 50 against 0.35–1.04s at 10 — so 5x fewer requests is roughly the same total server time in fewer, slower calls, and it cuts read-timeout headroom from ~10x to ~2.7x. Revisit with production latency in stage 8. See [ADR 0010](adr/0010-ingestion-runs-daily.md). |
+| `max-total-pages` | `500` | **Measured against the configured scope** | SP modality 6 is 171 pages over the week of 2026-09-15..21, so 24.4 a day; the configured 3-day window costs about **73 pages**, and 500 is roughly 7x that. The figure that is *not* measured is the national multiplier, and nothing that must pass depends on it any more — see the design limit in [ADR 0010](adr/0010-ingestion-runs-daily.md). |
+| `modality-codes` | `[6]` | **Evidenced, and a known limitation** | 6 is the only `codigoModalidadeContratacao` in the original samples, and PNCP rejects the call without one. Modalities 4 and 8 have since been sampled and measured but are **not** configured: adding one is a volume decision, and `ObservedPageVolume` refuses to price a modality nobody has measured. The system deliberately sees a fraction of PNCP's catalogue rather than inventing the rest of the table. |
 | `max-concurrent-requests` | `8` | **Guess** | No PNCP rate-limit documentation was consulted and nothing in the samples speaks to it. 8 is a conventional polite number. |
-| `connect-timeout` | `2s` | **Measured (n=4, 2026-09-22)** | Observed connect took 0.05–0.09s. 2s is over 20x the slowest measurement, which is generous on purpose: a connect that is merely slow should not fail, and a connect that never completes is what this bounds. |
-| `read-timeout` | `10s` | **Measured (n=4, 2026-09-22)** | Time to first byte on the consulta endpoint was 0.35s, 0.73s, 0.79s and 1.04s. 10s is about 10x the slowest normal response. Separately, two calls hung with zero bytes for over 60s and for about 7 minutes — that is what this value exists to bound, and the reason to keep it low rather than raise it. See the 504 observation below, which is still *not* evidence for this number. |
-| `operation-deadline` | `5m` | **Guess, with arithmetic behind it** | A healthy run at the cap is about 500 pages over 8 at a time, roughly a minute; this leaves five times that. The number it is protecting against is real: 500 pages × 3 attempts × a 10s read timeout is over half an hour for one invocation. |
+| `connect-timeout` | `2s` | **Measured (n=5, 2026-09-23)** | Observed connect took 0.05–0.09s. 2s is over 20x the slowest measurement, which is generous on purpose: a connect that is merely slow should not fail, and a connect that never completes is what this bounds. |
+| `read-timeout` | `10s` | **Measured (n=5, 2026-09-23)** | Time to first byte on the consulta endpoint was 0.35–1.04s at `page-size: 10`. 10s is about 10x the slowest normal response. Separately, two calls hung with zero bytes for over 60s and for about 7 minutes — that is what this value exists to bound, and the reason to keep it low rather than raise it. Raising the page size would eat this headroom; see the row above. |
+| `operation-deadline` | `5m` | **Guess, with arithmetic behind it** | A healthy run at the cap is about 500 pages over 8 at a time, roughly a minute; this leaves five times that. The number it is protecting against is real: 500 pages × 3 attempts × a 10s read timeout is over half an hour for one invocation. **It used to mean ten minutes rather than five** — discovery runs in two phases and each opened its own budget. Fixed, and guarded by `PncpRunIsBoundedTest`. |
 | `--enable-preview` | on the Dockerfile `ENTRYPOINT` | **Not a tunable** | `StructuredTaskScope` is a preview API in Java 21 and the image cannot run without the flag. Deliberately *not* in `JAVA_TOOL_OPTIONS`: docker compose sets that variable and replaced it wholesale, which stripped the flag and broke startup once. An entrypoint is the one place no orchestrator clobbers by accident. Guarded by `PreviewFlagWiringTest` at build time and `PreviewFeatures.requireEnabled()` at boot. See [ADR 0008](adr/0008-virtual-threads-and-structured-concurrency-for-page-fetching.md). |
 | `user-agent` | project + repo URL | n/a | Not a tunable. PNCP is run by a public body and being identifiable costs nothing. |
 
-### Measurement, 2026-09-22: normal latency and two hangs
+### Measurement, 2026-09-23: normal latency, two hangs, and a 65% failure rate
 
-Four calls to `contratacoes/publicacao` on 2026-09-22:
+Five calls to `contratacoes/publicacao`, at `page-size: 10`:
 
 | | connect | time to first byte |
 | --- | --- | --- |
-| range across 4 calls | 0.05–0.09s | 0.35s, 0.73s, 0.79s, 1.04s |
+| range across 5 calls | 0.05–0.09s | 0.35–1.04s |
 
 Separately, **two calls accepted the connection and sent zero bytes** — once for over 60 seconds, once
 for nearly 7 minutes — and the same query answered in about a second minutes later.
+
+**Of 17 calls made to that endpoint on 2026-09-23, 11 failed:**
+
+| Failure | Count |
+| --- | --- |
+| HTTP 504 | 5 |
+| HTTP 502 / 503 | 3 |
+| Zero-byte hang (>60s, and ~7min) | 2 |
+| HTTP 500 | 1 |
+| **Total failed** | **11 of 17** |
+
+One 504 took **70 seconds** to arrive, which puts PNCP's own gateway give-up at about a minute — so
+a client read timeout above 60s would be waiting for a gateway that has already stopped waiting.
+
+Recovery was inconsistent: one retry series **recovered after two failures 15 seconds apart**, and
+another **had not recovered after about two minutes**. One afternoon is not a baseline. What it is
+enough to conclude is that **PNCP instability is routine rather than exceptional**, which is an
+argument about the *schedule* — see [ADR 0010](adr/0010-ingestion-runs-daily.md) — and not about
+these two numbers.
 
 That pair of facts is what promotes both timeouts from convention to measurement. A normal response
 arrives in about a second, so 10s is roughly ten times the slowest observed; and the hangs are
@@ -39,7 +58,7 @@ precisely the failure a read timeout exists for. **The hangs argue for keeping t
 raising it**: a client that waits out a 7-minute silence has turned a fast failure into a stalled
 run.
 
-### Observation, 2026-09-22: PNCP returned 504 under load
+### Observation, 2026-09-22: the 504 that started the investigation
 
 Not evidence for a timeout value. Recorded because it is evidence of something else.
 
@@ -67,7 +86,7 @@ and must not treat a failed run as an empty day.
 | Setting | Default | Label | Basis |
 | --- | --- | --- | --- |
 | `lookback-days` | `2` | **Guess, with a measured cost** | The value is a judgement about how much outage to survive. What it costs is measured, below. Coupled to `max-total-pages`; see [ADR 0010](adr/0010-ingestion-runs-daily.md). |
-| `states` | `[]` (everywhere) | n/a | Empty is what `ProcurementQuery` already expresses and what PNCP accepts as an omitted `uf`. |
+| `states` | `[SP]` | **Product decision, and load-bearing** | SP is the scope this project serves. It was `[]`, meaning every state, which PNCP accepts as an omitted `uf` — and at the measured volumes a national run needs about 440 pages of a 500 cap with no margin left. The configured scope is now what the fan-out margin test prices, so this value is not cosmetic. |
 
 ### What the lookback overlap actually costs
 
@@ -75,24 +94,29 @@ An earlier note in this repository said re-reading a day "costs nothing, because
 deduplicates on content hash". **That is true for storage and false for requests**, and the
 difference matters because PNCP is a public API that has already been observed falling over.
 
-Measured volume, from two independent readings:
+Measured volume, SP at `page-size: 10`, all on the week of 2026-09-15..21 (measured 2026-09-23):
 
-- `contratacoes/publicacao` reported `totalRegistros: 1697, totalPaginas: 170` for one week of SP;
-- a live run reported `totalRegistros: 1891, totalPaginas: 190` for eight days of SP.
+| Modality | Pages | Pages per day | Configured? |
+| --- | --- | --- | --- |
+| 6, Pregão eletrônico | 171 | **24.4** | yes |
+| 8, Dispensa | 344 | **49.1** | no |
+| 4, Concorrência eletrônica | — | **≤ 4** (estimate) | no |
 
-Both give **about 240 SP notices a day, or 24 pages** at `page-size: 10`. The national multiplier of
-roughly 4 to 6 is an estimate from SP's share of Brazilian municipalities, so:
+**A lookback of 2 days is 3 calendar days of pages, not 2.** `dataInicial` and `dataFinal` are
+inclusive and the window is `today-2` through `today`. Counting 2 was an arithmetic error in the
+margin test, and at these volumes it was the difference between the check passing and failing.
 
 | | pages per run |
 | --- | --- |
-| One day, nationally | 100–160 |
-| **Two days (`lookback-days: 2`)** | **200–320** |
-| The overlap alone, per run | **100–160** |
+| One day, SP, modality 6 | 24 |
+| **The configured window (3 calendar days)** | **73** |
+| The overlap alone, per run | **49** |
 
-So the overlap is **100 percent overhead on the minimum**, not a handful of pages. It is still worth
-paying: a single missed run without it loses a day of notices permanently, and a lost notice is the
-one failure this system exists to prevent. But it is a real, recurring cost against somebody else's
-infrastructure and it should be stated as one.
+So the overlap is **200 percent overhead on the minimum** — two redundant days on every run, not
+one. It is still worth paying: a single missed run without it loses a day of notices permanently,
+and a lost notice is the one failure this system exists to prevent. Given how often PNCP was
+observed failing, that redundancy is the cheapest insurance here. But it is a real recurring cost
+against somebody else's infrastructure and it should be stated as one.
 
 ### Why the schedule is daily, and what sub-daily would cost
 
@@ -105,12 +129,18 @@ full day of pages, and running more often than daily re-fetches the same pages:
 
 | Schedule | Runs per day | Pages per day |
 | --- | --- | --- |
-| **Daily** | 1 | **200–320** |
-| Every 6 hours | 4 | 800–1,280 |
-| Hourly | 24 | 4,800–7,680 |
+| **Daily** | 1 | **73** |
+| Every 6 hours | 4 | 293 |
+| Hourly | 24 | 1,757 |
 
-Sub-daily scheduling multiplies request cost linearly and buys at most one day of freshness, against
-a median proposal window of 14 days. Daily is the interval the API's own granularity argues for.
+Sub-daily *scheduling* multiplies request cost linearly and buys at most one day of freshness,
+against a median proposal window of 14 days. Daily is the interval the API's own granularity argues
+for.
+
+**Attempting more often is a different question from fetching more often**, and one attempt a day is
+fragile against an API that failed 11 of 17 calls in an afternoon. ADR 0010 proposes attempting
+every three hours while still fetching at most once a day, guarded on whether today's window has
+already succeeded. That leaves this table unchanged when PNCP is healthy.
 
 ### The window and the fan-out cap are checked against each other
 
@@ -119,22 +149,27 @@ never once succeed — a configuration deadlock. Two things close it:
 
 - At runtime, `PncpFanOutTooLargeException` already says to narrow the date range rather than raise
   the cap, so the failure is at least legible.
-- At build time, `DiscoveryWindowFitsTheFanOutCapTest` binds the real configuration and fails if
-  `lookback-days x 160` exceeds the cap, or comes within a 1.5x margin of it. Setting
-  `lookback-days: 4` fails it with *"a 4 day lookback needs about 640 pages at 160 a day, against a
-  cap of 500"*.
+- At build time, `DiscoveryWindowFitsTheFanOutCapTest` binds the real configuration and prices the
+  **configured** scope through `ObservedPageVolume`, failing if the window exceeds the cap or comes
+  within a 1.5x margin of it.
 
-**The current margin is thinner than it looks.** At the pessimistic estimate the defaults need 320
-pages of a 500 cap, so the 1.5x margin assertion clears at 480 against 500. Raising `lookback-days`
-to 3, or PNCP volume growing by half, breaks it. That is the intended behaviour — it should break in
-CI rather than at 3am — but it means this pair of numbers is close-coupled and neither moves alone.
+`ObservedPageVolume` **refuses to estimate.** A state or a modality nobody has ever measured makes
+it throw — *"no page volume has ever been observed for RJ, and SP's figures are not a stand in for
+it. Measure it before configuring it."* — so widening the scope fails the build rather than being
+discovered from the traffic. That refusal replaced a national extrapolation which had been gating a
+configuration that was not national.
+
+**The current margin is comfortable, and it is comfortable because the scope is one state.** The
+defaults need 73 pages of a 500 cap, clearing the 1.5x assertion at 110. The same window nationally
+needs about 440, which passes the cap and fails the margin — which is why national scope is recorded
+in ADR 0010 as a limit requiring a different invocation shape, rather than as a bigger cap.
 
 ## Resilience — hardcoded in `PncpPageClient`
 
 | Setting | Value | Label |
 | --- | --- | --- |
 | retry attempts | `3` | **Guess** — convention |
-| retry backoff | `200ms`, ×2, jitter `0.5` | **Guess** — convention, not tuned against any observed PNCP recovery |
+| retry backoff | `200ms`, ×2, jitter `0.5` | **Guess** — convention, and now measured against observed PNCP recovery. See below. |
 | breaker sliding window | `20` calls | **Guess** |
 | breaker minimum calls | `10` | **Guess** |
 | breaker failure threshold | `50%` | **Guess** |
@@ -142,6 +177,78 @@ CI rather than at 3am — but it means this pair of numbers is close-coupled and
 
 These four breaker values are smaller than Resilience4j's defaults (100 / 100 / 50% / 60s) because
 per-invocation call volume here is low. That reasoning is sound and the numbers are still taste.
+
+### How long the retries actually cover
+
+`maxAttempts(3)` with `ofExponentialRandomBackoff(200ms, 2.0, 0.5)` gives two waits, each
+randomised ±50%:
+
+| | base | actual range |
+| --- | --- | --- |
+| wait after attempt 1 | 200ms | 100–300ms |
+| wait after attempt 2 | 400ms | 200–600ms |
+| **total backoff** | 600ms | **300–900ms** |
+
+Wall clock for the whole series depends entirely on how PNCP fails:
+
+| Failure mode | Time per attempt | Whole retry series |
+| --- | --- | --- |
+| Fast 5xx (500/502/503) | ~0.3s | **~1.5s** |
+| Zero-byte hang, or a 504 slower than the read timeout | 10s | **~30.6s** |
+
+**So against the failures that actually dominate, the retry series is over in about a second and a
+half** — well inside any outage. The 30s figure only appears when the read timeout is doing the
+work, which is an accident of that timeout rather than a retry budget.
+
+Measured against what PNCP did on 2026-09-23: one series **recovered after two failures 15 seconds
+apart**, which this configuration would have missed by an order of magnitude; another **had not
+recovered after two minutes**, which no per-page retry should be trying to cover.
+
+**Recommendation: do not stretch this to 30 seconds.** Reasons, in order of weight:
+
+1. It would cover one of the two observed recoveries and neither is a baseline.
+2. The fan out holds a concurrency permit for the whole series. Eight pages each waiting out 30s
+   turns a fast, honest failure into a slow one, and the first-failure latch means the run is
+   already doomed by then anyway.
+3. The circuit breaker opens after 10 recorded calls, so during a real outage only the first handful
+   of pages get their full retry budget regardless of how generous it is.
+4. **Riding out an outage is the schedule's job, not the retry's.** A three-hourly re-attempt covers
+   both the 15-second case and the two-minute case, and costs nothing when PNCP is healthy. See
+   [ADR 0010](adr/0010-ingestion-runs-daily.md).
+
+If the per-page budget is to move at all, the defensible change is small: initial backoff `200ms` →
+`1s`, keeping 3 attempts and ×2, giving 1.5–4.5s. That covers a genuine blip without pretending to
+survive an outage. **Not applied — it is a change to a configured number and wants a decision.**
+
+### What an open circuit does to a run in progress
+
+The breaker records each *attempt*, not each fetch, because it sits inside the retry. At a 65%
+failure rate it reaches its 10-call minimum within roughly the first two attempt-rounds of the eight
+concurrent first-page fetches, and opens.
+
+**Nothing published, nothing half-done.** `StructuredFanOut` throws rather than returning what it
+managed, so `PncpProcurementSource.fetch` throws, so `ProcurementDiscoveryJob` never reaches its
+publish loop. A failed run publishes **zero** messages. There is no partial state to reconcile —
+only a run that did not happen.
+
+**The lookback recovers it.** A notice published on day D is inside the window of the runs on D,
+D+1 and D+2, because the window is three calendar days:
+
+| Run day | Window | Covers D? |
+| --- | --- | --- |
+| D | D-2 … D | yes |
+| D+1 | D-1 … D+1 | yes |
+| D+2 | D … D+2 | yes |
+| D+3 | D+1 … D+3 | **no** |
+
+So **two consecutive failed days lose nothing**: the run on D+2 still covers D. The cost is
+freshness — a notice found two days late has lost about 14% of a 14-day proposal window, and the
+deadline rule scores it slightly lower rather than missing it.
+
+**The third consecutive failed run is the one that loses data**, and it loses day D permanently and
+silently. That is the real argument for re-attempting within the day rather than for a wider
+lookback: three failed days in a row is unlikely, and a lost notice is the one failure this system
+exists to prevent.
 
 ### Considered and deferred: lowering `minimumNumberOfCalls`
 
