@@ -37,10 +37,14 @@ radar:
     # storage side, because the consumer deduplicates on content hash, and NOT free on the request
     # side: it is a full extra day of pages on every run. See docs/configuration.md.
     #
-    # This is 2 days of lookback but THREE calendar days of pages: dataInicial and dataFinal are
-    # inclusive, and the window runs today-2 through today. DiscoveryWindowFitsTheFanOutCapTest
-    # counts it that way.
-    lookback-days: 2
+    # This is 3 days of lookback but FOUR calendar days of pages: dataInicial and dataFinal are
+    # inclusive, and the window runs today-3 through today.
+    #
+    # Sized for reliability, not for volume. A publication date is only covered by a cycle that ran
+    # AFTER it closed, so a lookback of N gives N-1 covering cycles: 3 survives two consecutive
+    # lost days, and the likeliest lost day is this single instance being down rather than PNCP.
+    # The late-arrival distribution is what revisits this number. See ADR 0010.
+    lookback-days: 3
     # SP only, which is the scope this project actually serves. It was [] - every state - which
     # PNCP accepts as an omitted uf, and at the measured volumes a national run needs about 440
     # pages of a 500 cap with no margin left. National scope is a design limit rather than a
@@ -48,22 +52,25 @@ radar:
     states: [SP]
   pncp:
     base-url: https://pncp.gov.br/api/consulta
-    # PNCP requires codigoModalidadeContratacao on every call, and 6 is the only value the
-    # recorded samples evidence. A list from day one, so adding codes is config rather than code.
-    # Known limitation: the system therefore sees one modality out of PNCP's catalogue.
+    # PNCP requires codigoModalidadeContratacao on every call. Measured 2026-09-23 on SP over
+    # 2026-09-15..21: modality 6 is 24.4 pages a day and modality 8 is 49.1, both counted.
+    # Modality 4 is an ESTIMATE bounded at 4 a day: its seven day query failed four times, and a
+    # day by day retry hit 21 consecutive zero-byte hangs. Chunking makes that safe to configure,
+    # since an underestimate fails one chunk against its cap instead of truncating a run.
     modality-codes:
+      - 4
       - 6
+      - 8
     # PNCP does accept 50, verified 2026-09-23, and it is the single largest lever on request
     # volume. Kept at 10 anyway: time to first byte was 3.7s at 50 against 0.35-1.04s at 10, so
     # latency scales with page size and the saving is 5x fewer requests rather than less server
     # time - while leaving the 10s read timeout only ~2.7x headroom. Revisit with production
     # latency data in stage 8. See ADR 0010.
     page-size: 10
-    # Caps the whole fan-out, not just how much runs at once. Measured 2026-09-23: SP modality 6
-    # is 24.4 pages a day, so the configured 3 day window costs about 73 pages and this is roughly
-    # 7x normal operation. A multi-day catch-up belongs in chunking the window, not in loosening
-    # this. See ADR 0008 and ADR 0010.
-    max-total-pages: 500
+    # Caps ONE chunk: one publication date, one modality, one state. The largest chunk is a peak
+    # day of modality 8, about 71 pages, so this is roughly 7x it. It no longer moves with the
+    # lookback, which is what chunking bought. See ADR 0008 and ADR 0010.
+    max-pages-per-chunk: 500
     max-concurrent-requests: 8
     # Both measured on 2026-09-23 (n=5): connect took 0.05-0.09s, time to first byte 0.35-1.04s
     # at page size 10. Two calls also hung with zero bytes for 60s and ~7min, which is what

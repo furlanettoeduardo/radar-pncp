@@ -65,6 +65,31 @@ class ObservedPageVolumeTest {
   }
 
   @Test
+  @DisplayName("the largest chunk is one peak day of the biggest configured modality")
+  void theLargestChunkIsAPeakDayOfTheBiggestModality() {
+    assertThat(ObservedPageVolume.peakPagesForLargestChunk(SP, List.of(4, 6, 8)))
+        .as("a chunk is one date and one modality, so states and days do not multiply into it")
+        .isCloseTo(70.77, within(0.01));
+  }
+
+  @Test
+  @DisplayName("a peak run is every configured modality across the whole window, at peak")
+  void aPeakRunIsEveryModalityAcrossTheWindow() {
+    assertThat(ObservedPageVolume.peakPagesForRun(3, SP, List.of(4, 6, 8)))
+        .as("four calendar days at a 1.44 peak over 77.6 average pages a day")
+        .isCloseTo(446.81, within(0.01));
+  }
+
+  @Test
+  @DisplayName("the peak multiplier is applied to the average, not mistaken for it")
+  void thePeakMultiplierIsAppliedToTheAverage() {
+    double average = ObservedPageVolume.pagesPerDay(SP, List.of(8));
+    double peak = ObservedPageVolume.peakPagesForLargestChunk(SP, List.of(8));
+
+    assertThat(peak / average).isCloseTo(1.44, within(0.001));
+  }
+
+  @Test
   @DisplayName("the design limit: national scope over every modality cannot fit any sane cap")
   void nationalScopeOverEveryModalityExceedsTheCap() {
     double pages = ObservedPageVolume.pagesForRun(2, EVERYWHERE, List.of(4, 6, 8));

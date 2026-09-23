@@ -66,7 +66,40 @@ final class ObservedPageVolume {
    */
   static final double NATIONAL_MULTIPLIER = 6.0;
 
+  /**
+   * How much busier a peak day is than the weekly average.
+   *
+   * <p>Measured once: modality 8 published 707 records on Thursday 2026-09-17 against a weekly
+   * average of 491 a day over 2026-09-15..21, which is 1.44. A run covers three or four recent
+   * calendar days and three consecutive weekdays is the ordinary case, so the average is the wrong
+   * figure to size anything against — weekends are in it and a run usually is not.
+   *
+   * <p>One observation of one modality. It is an estimate, and the honest kind: it is applied to
+   * make every budget larger, never to justify one that already fits.
+   */
+  static final double PEAK_MULTIPLIER = 1.44;
+
   private ObservedPageVolume() {}
+
+  /**
+   * The biggest single chunk, which is what the per-chunk cap has to accommodate.
+   *
+   * <p>A chunk is one publication date, one modality and one state, so neither the number of
+   * configured states nor the width of the window multiplies into it. That is the whole reason
+   * chunking removed the margin problem: the cap now bounds the largest thing that can be attempted
+   * rather than the sum of everything attempted.
+   */
+  static double peakPagesForLargestChunk(Set<BrazilianState> states, List<Integer> modalityCodes) {
+    states.forEach(ObservedPageVolume::requireObserved);
+    return modalityCodes.stream().mapToDouble(ObservedPageVolume::observe).max().orElse(0)
+        * PEAK_MULTIPLIER;
+  }
+
+  /** Every chunk of a run, on a day when every modality is at peak. */
+  static double peakPagesForRun(
+      int lookbackDays, Set<BrazilianState> states, List<Integer> modalityCodes) {
+    return pagesForRun(lookbackDays, states, modalityCodes) * PEAK_MULTIPLIER;
+  }
 
   static double pagesPerDay(Set<BrazilianState> states, List<Integer> modalityCodes) {
     double perState = modalityCodes.stream().mapToDouble(ObservedPageVolume::observe).sum();

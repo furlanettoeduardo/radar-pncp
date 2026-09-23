@@ -120,12 +120,15 @@ public final class PncpProcurementSource implements ProcurementSource, Procureme
   }
 
   private void requireWithinCap(int pages, ProcurementQuery query) {
-    if (pages > properties.maxTotalPages()) {
+    if (pages > properties.maxPagesPerChunk()) {
       throw new PncpFanOutTooLargeException(
           ("%s to %s would need %d pages, over the configured maximum of %d. "
                   + "Narrow the date range rather than raising the cap.")
               .formatted(
-                  query.publishedFrom(), query.publishedTo(), pages, properties.maxTotalPages()));
+                  query.publishedFrom(),
+                  query.publishedTo(),
+                  pages,
+                  properties.maxPagesPerChunk()));
     }
   }
 

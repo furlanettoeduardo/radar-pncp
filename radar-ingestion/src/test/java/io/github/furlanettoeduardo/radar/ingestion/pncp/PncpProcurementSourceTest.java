@@ -39,13 +39,13 @@ class PncpProcurementSourceTest {
 
   private final MeterRegistry meters = new SimpleMeterRegistry();
 
-  private PncpProcurementSource sourceWith(int maxTotalPages) {
+  private PncpProcurementSource sourceWith(int maxPagesPerChunk) {
     PncpProperties properties =
         new PncpProperties(
             PNCP.baseUrl(),
             List.of(6),
             10,
-            maxTotalPages,
+            maxPagesPerChunk,
             8,
             Duration.ofSeconds(2),
             Duration.ofSeconds(2),
