@@ -1,6 +1,7 @@
 package io.github.furlanettoeduardo.radar.ingestion.persistence;
 
 import io.github.furlanettoeduardo.radar.domain.port.ProcurementRepository;
+import io.github.furlanettoeduardo.radar.ingestion.discovery.DiscoveryChunkRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -19,5 +20,10 @@ public class PersistenceConfiguration {
   @Bean
   ProcurementRepository procurementRepository(JdbcClient jdbcClient) {
     return new JdbcProcurementRepository(jdbcClient);
+  }
+
+  @Bean
+  DiscoveryChunkRepository discoveryChunkRepository(JdbcClient jdbcClient) {
+    return new JdbcDiscoveryChunkRepository(jdbcClient);
   }
 }

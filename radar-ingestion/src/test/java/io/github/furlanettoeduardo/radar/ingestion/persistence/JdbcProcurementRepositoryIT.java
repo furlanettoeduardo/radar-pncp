@@ -4,17 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.furlanettoeduardo.radar.domain.port.ProcurementRepository;
 import io.github.furlanettoeduardo.radar.domain.port.ProcurementRepositoryContract;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.stream.Stream;
 import javax.sql.DataSource;
-import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -42,17 +37,7 @@ class JdbcProcurementRepositoryIT extends ProcurementRepositoryContract {
 
   @BeforeAll
   static void applyTheRealMigrations() {
-    DriverManagerDataSource source = new DriverManagerDataSource();
-    source.setUrl(POSTGRES.getJdbcUrl());
-    source.setUsername(POSTGRES.getUsername());
-    source.setPassword(POSTGRES.getPassword());
-    dataSource = source;
-
-    Flyway.configure()
-        .dataSource(dataSource)
-        .locations("filesystem:" + migrationsOwnedByTheApiModule())
-        .load()
-        .migrate();
+    dataSource = SchemaFixture.migrated(POSTGRES);
   }
 
   @BeforeEach
@@ -77,26 +62,5 @@ class JdbcProcurementRepositoryIT extends ProcurementRepositoryContract {
     assertThat(applied)
         .as("if this is zero the location below silently pointed at nothing")
         .isPositive();
-  }
-
-  /**
-   * Resolves {@code radar-api}'s migration directory from whichever directory the build happens to
-   * run in. Maven sets it to the module, an IDE often sets it to the repository root, and a
-   * location that silently resolves to nothing would leave Flyway reporting a clean success over an
-   * empty schema.
-   */
-  private static Path migrationsOwnedByTheApiModule() {
-    Path relative = Path.of("radar-api", "src", "main", "resources", "db", "migration");
-    return Stream.of(Path.of(""), Path.of(".."))
-        .map(base -> base.resolve(relative).toAbsolutePath().normalize())
-        .filter(Files::isDirectory)
-        .findFirst()
-        .orElseThrow(
-            () ->
-                new IllegalStateException(
-                    "could not find radar-api's migrations from "
-                        + Path.of("").toAbsolutePath()
-                        + ". This test applies the schema its owner defines; it does not carry a"
-                        + " copy."));
   }
 }

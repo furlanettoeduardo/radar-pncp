@@ -47,7 +47,7 @@ class RadarApiApplicationIT {
 
     assertThat(applied)
         .as("every migration in db/migration, in order, and none of them failed")
-        .containsExactly("1", "2");
+        .containsExactly("1", "2", "3");
   }
 
   @Test
