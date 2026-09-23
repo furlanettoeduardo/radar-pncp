@@ -17,23 +17,21 @@ import org.springframework.boot.test.context.SpringBootTest;
  * job, is a much worse way to learn it than a red build.
  *
  * <p>This binds the real configuration rather than parsing the YAML, so it cannot drift from what
- * the application actually loads.
+ * the application actually loads, and it costs what the <em>configured</em> scope costs. An earlier
+ * version asserted against a national extrapolation while the application was configured for one
+ * state, which gated a working configuration on a number describing a different system. National
+ * scope is a real limit and it is recorded as one, in ADR 0010 and in {@link
+ * ObservedPageVolumeTest}, rather than here.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class DiscoveryWindowFitsTheFanOutCapTest {
 
   /**
-   * Pages PNCP returns for one day, nationally, at the configured page size.
-   *
-   * <p>Derived from measurement, not chosen: {@code contratacoes/publicacao} reported {@code
-   * totalPaginas: 170} for one week of SP, and a live run reported 190 for eight days — call it 24
-   * pages a day for SP. The national multiplier of roughly 4 to 6 is an estimate from SP's share of
-   * Brazilian municipalities, so 160 is the pessimistic end of it.
-   *
-   * <p>If PNCP volume grows, this constant is wrong before the cap is, which is why the assertion
-   * below leaves headroom rather than asserting the exact boundary.
+   * Why 1.5 and not 1.0: the volume figures are a single week of observation against an API whose
+   * output is somebody else's publishing schedule. A cap that is only reached on a busy Tuesday is
+   * a cap that fails unpredictably, which is worse than one that fails always.
    */
-  private static final int PESSIMISTIC_PAGES_PER_DAY = 160;
+  private static final double SAFETY_FACTOR = 1.5;
 
   private final DiscoveryProperties discovery;
   private final PncpProperties pncp;
@@ -45,27 +43,35 @@ class DiscoveryWindowFitsTheFanOutCapTest {
   }
 
   @Test
-  @DisplayName("the default lookback window cannot need more pages than the fan out cap allows")
-  void theDefaultWindowFitsWithinTheCap() {
-    int pagesAWorstCaseRunWouldNeed = discovery.lookbackDays() * PESSIMISTIC_PAGES_PER_DAY;
+  @DisplayName("the configured window and scope cannot need more pages than the cap allows")
+  void theConfiguredWindowFitsWithinTheCap() {
+    double needed =
+        ObservedPageVolume.pagesForRun(
+            discovery.lookbackDays(), discovery.states(), pncp.modalityCodes());
 
-    assertThat(pagesAWorstCaseRunWouldNeed)
+    assertThat(needed)
         .as(
-            "a %d day lookback needs about %d pages at %d a day, against a cap of %d",
+            "a %d day lookback over %s for modalities %s needs about %.0f pages, against a cap of"
+                + " %d",
             discovery.lookbackDays(),
-            pagesAWorstCaseRunWouldNeed,
-            PESSIMISTIC_PAGES_PER_DAY,
+            discovery.states().isEmpty() ? "every state" : discovery.states(),
+            pncp.modalityCodes(),
+            needed,
             pncp.maxTotalPages())
         .isLessThanOrEqualTo(pncp.maxTotalPages());
   }
 
   @Test
-  @DisplayName("and it keeps a margin, because the volume estimate is an estimate")
-  void theDefaultWindowKeepsAMargin() {
-    int pagesAWorstCaseRunWouldNeed = discovery.lookbackDays() * PESSIMISTIC_PAGES_PER_DAY;
+  @DisplayName("and it keeps a margin, because one week of volume is not a guarantee")
+  void theConfiguredWindowKeepsAMargin() {
+    double needed =
+        ObservedPageVolume.pagesForRun(
+            discovery.lookbackDays(), discovery.states(), pncp.modalityCodes());
 
-    assertThat(pagesAWorstCaseRunWouldNeed * 1.5)
-        .as("a cap reached only on a busy day is a cap that fails unpredictably")
+    assertThat(needed * SAFETY_FACTOR)
+        .as(
+            "%.0f pages leaves no %sx margin under a cap of %d",
+            needed, SAFETY_FACTOR, pncp.maxTotalPages())
         .isLessThanOrEqualTo(pncp.maxTotalPages());
   }
 }

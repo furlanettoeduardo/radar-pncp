@@ -23,9 +23,16 @@ radar:
     # far as the interval loses everything published during an outage. The overlap is free on the
     # storage side, because the consumer deduplicates on content hash, and NOT free on the request
     # side: it is a full extra day of pages on every run. See docs/configuration.md.
+    #
+    # This is 2 days of lookback but THREE calendar days of pages: dataInicial and dataFinal are
+    # inclusive, and the window runs today-2 through today. DiscoveryWindowFitsTheFanOutCapTest
+    # counts it that way.
     lookback-days: 2
-    # Empty means every state, which is what PNCP accepts as an omitted uf.
-    states: []
+    # SP only, which is the scope this project actually serves. It was [] - every state - which
+    # PNCP accepts as an omitted uf, and at the measured volumes a national run needs about 440
+    # pages of a 500 cap with no margin left. National scope is a design limit rather than a
+    # setting: see docs/adr/0010-ingestion-runs-daily.md for what has to change first.
+    states: [SP]
   pncp:
     base-url: https://pncp.gov.br/api/consulta
     # PNCP requires codigoModalidadeContratacao on every call, and 6 is the only value the
@@ -33,17 +40,22 @@ radar:
     # Known limitation: the system therefore sees one modality out of PNCP's catalogue.
     modality-codes:
       - 6
-    # The only page size any sample evidences. Raising it is the single largest lever on request
-    # volume, and there is no evidence yet that PNCP accepts more.
+    # PNCP does accept 50, verified 2026-09-23, and it is the single largest lever on request
+    # volume. Kept at 10 anyway: time to first byte was 3.7s at 50 against 0.35-1.04s at 10, so
+    # latency scales with page size and the saving is 5x fewer requests rather than less server
+    # time - while leaving the 10s read timeout only ~2.7x headroom. Revisit with production
+    # latency data in stage 8. See ADR 0010.
     page-size: 10
-    # Caps the whole fan-out, not just how much runs at once. One week of SP alone is 170 pages,
-    # and a daily all-states run is an estimated 100-160, so this is roughly 3x normal operation.
-    # A multi-day catch-up belongs in chunking the window, not in loosening this. See ADR 0008.
+    # Caps the whole fan-out, not just how much runs at once. Measured 2026-09-23: SP modality 6
+    # is 24.4 pages a day, so the configured 3 day window costs about 73 pages and this is roughly
+    # 7x normal operation. A multi-day catch-up belongs in chunking the window, not in loosening
+    # this. See ADR 0008 and ADR 0010.
     max-total-pages: 500
     max-concurrent-requests: 8
-    # Both measured on 2026-09-22 (n=4): connect took 0.05-0.09s, time to first byte 0.35-1.04s.
-    # Two calls also hung with zero bytes for 60s and ~7min, which is what read-timeout bounds and
-    # the reason to keep it low rather than raise it. See docs/configuration.md.
+    # Both measured on 2026-09-23 (n=5): connect took 0.05-0.09s, time to first byte 0.35-1.04s
+    # at page size 10. Two calls also hung with zero bytes for 60s and ~7min, which is what
+    # read-timeout bounds and the reason to keep it low rather than raise it. Of 17 calls that day
+    # 11 failed outright. See docs/configuration.md.
     connect-timeout: 2s
     read-timeout: 10s
     # Bounds a whole invocation, which per request timeouts do not. A healthy run at the cap is
