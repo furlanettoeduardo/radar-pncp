@@ -43,6 +43,24 @@
 
   <build>
     <plugins>
+      <!--
+        Publishes the test classes as a second artifact so that adapters in other modules can be
+        held to ProcurementRepositoryContract and can reuse the domain test builders. Test scope
+        only: nothing here reaches any runtime classpath, and the domain purity rule above is
+        unaffected because this adds no dependencies.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>publish-test-fixtures</id>
+            <goals>
+              <goal>test-jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>

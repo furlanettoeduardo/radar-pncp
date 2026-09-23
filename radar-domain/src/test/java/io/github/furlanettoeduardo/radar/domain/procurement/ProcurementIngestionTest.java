@@ -4,14 +4,10 @@ import static io.github.furlanettoeduardo.radar.domain.ProcurementBuilder.aProcu
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.github.furlanettoeduardo.radar.domain.port.ProcurementRepository;
+import io.github.furlanettoeduardo.radar.domain.port.InMemoryProcurementRepository;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -37,7 +33,7 @@ class ProcurementIngestionTest {
   private static final Instant EARLIER = Instant.parse("2026-09-01T17:22:01Z");
   private static final Instant LATER = Instant.parse("2026-09-05T09:00:00Z");
 
-  private final InMemoryProcurements stored = new InMemoryProcurements();
+  private final InMemoryProcurementRepository stored = new InMemoryProcurementRepository();
   private final ProcurementIngestion ingestion = new ProcurementIngestion(stored);
 
   // ---------------------------------------------------------------- the decision table
@@ -217,79 +213,5 @@ class ProcurementIngestionTest {
             throw new IllegalStateException(unexpected);
           }
         });
-  }
-
-  /**
-   * A fake, not a mock, and thread safe on purpose: the conditional writes have to behave like real
-   * compare-and-set or the race tests above would prove nothing.
-   */
-  private static final class InMemoryProcurements implements ProcurementRepository {
-
-    private final ConcurrentHashMap<PncpControlNumber, Procurement> rows =
-        new ConcurrentHashMap<>();
-    private final AtomicInteger writes = new AtomicInteger();
-    private final AtomicBoolean rejectEverything = new AtomicBoolean();
-    private volatile Runnable beforeNextWrite;
-
-    int writes() {
-      return writes.get();
-    }
-
-    void rejectEveryConditionalWrite() {
-      rejectEverything.set(true);
-    }
-
-    /** Simulates another writer slipping in between our read and our conditional write. */
-    void beforeNextWrite(Runnable interference) {
-      this.beforeNextWrite = interference;
-    }
-
-    private void runInterference() {
-      Runnable once = beforeNextWrite;
-      if (once != null) {
-        beforeNextWrite = null;
-        once.run();
-      }
-    }
-
-    @Override
-    public Optional<Procurement> findByControlNumber(PncpControlNumber controlNumber) {
-      return Optional.ofNullable(rows.get(controlNumber));
-    }
-
-    @Override
-    public boolean insertIfAbsent(Procurement procurement) {
-      runInterference();
-      if (rejectEverything.get()) {
-        return false;
-      }
-      boolean inserted = rows.putIfAbsent(procurement.controlNumber(), procurement) == null;
-      if (inserted) {
-        writes.incrementAndGet();
-      }
-      return inserted;
-    }
-
-    @Override
-    public boolean replaceIfUnchanged(Procurement procurement, String expectedSourcePayloadHash) {
-      runInterference();
-      if (rejectEverything.get()) {
-        return false;
-      }
-      AtomicBoolean replaced = new AtomicBoolean();
-      rows.computeIfPresent(
-          procurement.controlNumber(),
-          (key, current) -> {
-            if (current.sourcePayloadHash().equals(expectedSourcePayloadHash)) {
-              replaced.set(true);
-              return procurement;
-            }
-            return current;
-          });
-      if (replaced.get()) {
-        writes.incrementAndGet();
-      }
-      return replaced.get();
-    }
   }
 }
